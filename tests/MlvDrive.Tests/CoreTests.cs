@@ -3,6 +3,7 @@ using MlvDrive.Core.Audio;
 using MlvDrive.Core.Dng;
 using MlvDrive.Core.Mlv;
 using MlvDrive.Core.VirtualFs;
+using MlvDrive.Core.Testing;
 
 namespace MlvDrive.Tests;
 
@@ -53,7 +54,7 @@ public class ClipTests
     public void Indexes_frames_across_chunks_in_frame_order()
     {
         using var tmp = new TempDir();
-        var t = new TestMlv();
+        var t = new SyntheticClip();
         var main = t.Write(tmp.Path, "M08-1651", new[] { 3, 2, 2 }, order: new[] { 0, 2, 1, 4, 3, 6, 5 });
         using var clip = MlvClip.Open(main);
         Assert.Null(clip.Unsupported);
@@ -68,7 +69,7 @@ public class ClipTests
     public void Truncated_clip_keeps_complete_frames()
     {
         using var tmp = new TempDir();
-        var t = new TestMlv();
+        var t = new SyntheticClip();
         var main = t.Write(tmp.Path, "CUT", new[] { 4 });
         var bytes = File.ReadAllBytes(main);
         File.WriteAllBytes(main, bytes[..^500]);                  // last frame cut short, as mid-copy
@@ -81,7 +82,7 @@ public class ClipTests
     public void Garbage_after_frames_is_ignored()
     {
         using var tmp = new TempDir();
-        var t = new TestMlv();
+        var t = new SyntheticClip();
         var main = t.Write(tmp.Path, "JUNK", new[] { 2 });
         File.AppendAllText(main, new string('ÿ', 300));
         using var clip = MlvClip.Open(main);
@@ -102,7 +103,7 @@ public class ClipTests
     public void Lossless_clip_is_reported_unsupported()
     {
         using var tmp = new TempDir();
-        var t = new TestMlv { VideoClass = 0x21 };
+        var t = new SyntheticClip { VideoClass = 0x21 };
         using var clip = MlvClip.Open(t.Write(tmp.Path, "LJ", new[] { 1 }));
         Assert.Contains("lossless", clip.Unsupported);
     }
@@ -133,7 +134,7 @@ public class DngTests
     public void Dng_pixels_equal_the_recorded_pixels(int bpp)
     {
         using var tmp = new TempDir();
-        var t = new TestMlv { Bpp = bpp, Black = 128 << (bpp - 10), White = (1 << bpp) - 46 };
+        var t = new SyntheticClip { Bpp = bpp, Black = 128 << (bpp - 10), White = (1 << bpp) - 46 };
         using var clip = MlvClip.Open(t.Write(tmp.Path, "C", new[] { 2, 1 }));
         var seq = new DngSequence(clip);
         Assert.Equal(DngSequence.HeaderSize + t.Width * t.Height * 2, seq.FileSize);
@@ -151,7 +152,7 @@ public class DngTests
     public void Dng_header_describes_the_frame()
     {
         using var tmp = new TempDir();
-        var t = new TestMlv();
+        var t = new SyntheticClip();
         using var clip = MlvClip.Open(t.Write(tmp.Path, "M08-1651", new[] { 3 }));
         var seq = new DngSequence(clip);
         var tiff = new TiffReader(seq.BuildHeader(1));
@@ -232,7 +233,7 @@ public class AudioTests
     public void Embedded_audio_is_placed_by_timestamp_and_lasts_as_long_as_the_picture()
     {
         using var tmp = new TempDir();
-        var t = new TestMlv { WithAudio = true };
+        var t = new SyntheticClip { WithAudio = true };
         using var clip = MlvClip.Open(t.Write(tmp.Path, "A", new[] { 3, 2 }));
         var wav = EmbeddedWav.Create(clip)!;
 
@@ -248,8 +249,8 @@ public class AudioTests
         {
             long start = (long)(f * 1_000_000L * 1000 / 23976 * 192000L / 1_000_000L);
             start -= start % 4;
-            Assert.Equal(TestMlv.AudioByte(start), bytes[44 + start]);
-            Assert.Equal(TestMlv.AudioByte(start + 4799), bytes[44 + start + 4799]);
+            Assert.Equal(SyntheticClip.AudioByte(start), bytes[44 + start]);
+            Assert.Equal(SyntheticClip.AudioByte(start + 4799), bytes[44 + start + 4799]);
             if (start + 4800 < dataSize) Assert.Equal(0, bytes[44 + start + 4800]);
         }
 
@@ -267,7 +268,7 @@ public class AudioTests
         var video = Path.Combine(tmp.Path, "DCIM", "100CANON");
         var audio = Path.Combine(tmp.Path, "DCIM", "AUDIO");
         Directory.CreateDirectory(audio);
-        var main = new TestMlv().Write(video, "M08-1651", new[] { 1 });
+        var main = new SyntheticClip().Write(video, "M08-1651", new[] { 1 });
         File.WriteAllBytes(Path.Combine(audio, "M08-1651.WAV"), new byte[] { 1, 2, 3 });
         Assert.Equal(Path.Combine(audio, "M08-1651.WAV"), PassThroughFile.FindScratchWav(main));
     }
@@ -280,7 +281,7 @@ public class TreeTests
     {
         using var tmp = new TempDir();
         var video = Path.Combine(tmp.Path, "DCIM", "100CANON");
-        var t = new TestMlv();
+        var t = new SyntheticClip();
         t.Write(video, "M08-1651", new[] { 2 });
         t.Write(video, "M08-1652", new[] { 1 });
         Directory.CreateDirectory(Path.Combine(tmp.Path, "Empty"));
@@ -308,7 +309,7 @@ public class TreeTests
     public void Clip_still_being_copied_fills_in()
     {
         using var tmp = new TempDir();
-        var t = new TestMlv();
+        var t = new SyntheticClip();
         var main = t.Write(tmp.Path, "GROW", new[] { 4 });
         var full = File.ReadAllBytes(main);
         File.WriteAllBytes(main, full[..(full.Length / 2)]);
@@ -325,10 +326,32 @@ public class TreeTests
     }
 
     [Fact]
+    public void Idle_clips_release_their_files_and_reopen_on_read()
+    {
+        using var tmp = new TempDir();
+        var t = new SyntheticClip();
+        var main = t.Write(tmp.Path, "EJECT", new[] { 2, 1 });
+        using var cache = new ClipCache();
+        var root = SourceScanner.Build(new[] { new ClipSource("D", tmp.Path) }, cache);
+        var dng = (VFile)VirtualPath.Resolve(root, @"D\EJECT\EJECT_000002.dng")!;
+        var before = new byte[dng.Size];
+        dng.Read(0, before);
+
+        cache.ReleaseIdle(TimeSpan.Zero);
+        // Nothing holds the files now: an exclusive open (what ejecting needs) succeeds.
+        foreach (var f in Directory.GetFiles(tmp.Path))
+            using (File.Open(f, FileMode.Open, FileAccess.Read, FileShare.None)) { }
+
+        var after = new byte[dng.Size];
+        dng.Read(0, after);
+        Assert.Equal(before, after);
+    }
+
+    [Fact]
     public void Unsupported_clip_explains_itself()
     {
         using var tmp = new TempDir();
-        new TestMlv { VideoClass = 0x21 }.Write(tmp.Path, "LJ", new[] { 1 });
+        new SyntheticClip { VideoClass = 0x21 }.Write(tmp.Path, "LJ", new[] { 1 });
         using var cache = new ClipCache();
         var root = SourceScanner.Build(new[] { new ClipSource("D", tmp.Path) }, cache);
         var note = Assert.IsType<VFile>(Assert.Single(((VDirectory)VirtualPath.Resolve(root, @"D\LJ")!).Children()));
@@ -342,8 +365,8 @@ public class TreeTests
     {
         using var a = new TempDir();
         using var b = new TempDir();
-        new TestMlv().Write(a.Path, "X", new[] { 1 });
-        new TestMlv().Write(b.Path, "X", new[] { 1 });
+        new SyntheticClip().Write(a.Path, "X", new[] { 1 });
+        new SyntheticClip().Write(b.Path, "X", new[] { 1 });
         using var cache = new ClipCache();
         var root = SourceScanner.Build(new[] { new ClipSource("Card", a.Path), new ClipSource("Card", b.Path) }, cache);
         Assert.Equal(new[] { "Card", "Card (2)" }, root.Children().Select(c => c.Name).ToArray());

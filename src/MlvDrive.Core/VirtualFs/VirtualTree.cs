@@ -141,6 +141,33 @@ public sealed class ClipCache : IDisposable
         return built;
     }
 
+    /// <summary>
+    /// Close the files of clips not read for <paramref name="idle"/>. They reopen on the
+    /// next read, so this is invisible to an editor but lets a drive be ejected.
+    /// </summary>
+    public void ReleaseIdle(TimeSpan idle)
+    {
+        List<MlvClip> clips;
+        lock (_lock) clips = _entries.Values.Select(e => e.Clip).OfType<MlvClip>().ToList();
+        foreach (var c in clips)
+            if (c.IdleMilliseconds >= idle.TotalMilliseconds) c.ReleaseHandles();
+    }
+
+    /// <summary>Close and forget every clip under <paramref name="rootPath"/> (a drive that was removed).</summary>
+    public void Forget(string rootPath)
+    {
+        var prefix = Path.TrimEndingDirectorySeparator(rootPath) + Path.DirectorySeparatorChar;
+        lock (_lock)
+        {
+            foreach (var key in _entries.Keys.Where(k => k.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToList())
+            {
+                _entries.Remove(key, out var e);
+                _lru.Remove(key);
+                e?.Clip?.Dispose();
+            }
+        }
+    }
+
     /// <summary>Forget every opened clip (after a settings change).</summary>
     public void Clear()
     {

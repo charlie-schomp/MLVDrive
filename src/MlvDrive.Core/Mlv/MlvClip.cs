@@ -37,7 +37,11 @@ public sealed class MlvClip : IDisposable
     public IReadOnlyList<string> Warnings => _warnings;
 
     readonly List<string> _paths = new();
-    readonly List<SafeFileHandle> _handles = new();
+    // Opened on demand and released when idle (see ReleaseHandles), so an idle clip
+    // never stops its drive from being ejected.
+    SafeFileHandle?[] _handles = Array.Empty<SafeFileHandle?>();
+    readonly object _handleLock = new();
+    long _lastUse = Environment.TickCount64;
     readonly List<FrameRef> _frames = new();
     readonly List<AudioRef> _audio = new();
     readonly List<string> _warnings = new();
@@ -88,7 +92,7 @@ public sealed class MlvClip : IDisposable
             SafeFileHandle h;
             try
             {
-                h = File.OpenHandle(_paths[fi], FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, FileOptions.RandomAccess);
+                h = OpenFile(_paths[fi]);
             }
             catch (IOException) when (fi > 0)
             {
@@ -96,9 +100,9 @@ public sealed class MlvClip : IDisposable
                 _paths.RemoveRange(fi, _paths.Count - fi);
                 break;
             }
-            _handles.Add(h);
-            WalkFile(fi, h, frames);
+            using (h) WalkFile(fi, h, frames);
         }
+        _handles = new SafeFileHandle?[_paths.Count];
 
         if (!Header.IsRaw)
             Unsupported = "not a raw video clip";
@@ -250,10 +254,8 @@ public sealed class MlvClip : IDisposable
     /// <summary>Read raw bytes from one of the clip's files at an absolute position.</summary>
     public int ReadFile(int fileIndex, long offset, Span<byte> destination)
     {
-        var handles = _handles;
-        if (_disposed || (uint)fileIndex >= (uint)handles.Count) throw new IOException($"{BaseName}: clip was closed");
-        var h = handles[fileIndex];
-        if (h.IsClosed) throw new IOException($"{BaseName}: clip was closed");
+        _lastUse = Environment.TickCount64;
+        var h = Handle(fileIndex);
         int total = 0;
         while (total < destination.Length)
         {
@@ -264,11 +266,43 @@ public sealed class MlvClip : IDisposable
         return total;
     }
 
+    static SafeFileHandle OpenFile(string path) =>
+        File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, FileOptions.RandomAccess);
+
+    SafeFileHandle Handle(int fileIndex)
+    {
+        lock (_handleLock)
+        {
+            if (_disposed) throw new IOException($"{BaseName}: clip was closed");
+            if ((uint)fileIndex >= (uint)_handles.Length) throw new IOException($"{BaseName}: no file {fileIndex}");
+            var h = _handles[fileIndex];
+            if (h is null || h.IsClosed)
+                _handles[fileIndex] = h = OpenFile(_paths[fileIndex]);
+            return h;
+        }
+    }
+
+    /// <summary>Milliseconds since this clip last read its files.</summary>
+    public long IdleMilliseconds => Environment.TickCount64 - Interlocked.Read(ref _lastUse);
+
+    /// <summary>Close the clip's files; the next read reopens them. Lets the drive be ejected.</summary>
+    public void ReleaseHandles()
+    {
+        lock (_handleLock)
+        {
+            for (int i = 0; i < _handles.Length; i++)
+            {
+                _handles[i]?.Dispose();
+                _handles[i] = null;
+            }
+        }
+    }
+
     volatile bool _disposed;
 
     public void Dispose()
     {
         _disposed = true;
-        foreach (var h in _handles) h.Dispose();
+        ReleaseHandles();
     }
 }

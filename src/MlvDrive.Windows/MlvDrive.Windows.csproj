@@ -1,7 +1,12 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <ProjectReference Include="..\MlvDrive.Core\MlvDrive.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Pinned to the WinFsp release the installer installs (2.1.25156). -->
+    <PackageReference Include="winfsp.net" Version="2.1.25156" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -10,6 +15,19 @@
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>MLVDrive</AssemblyName>
+    <RootNamespace>MlvDrive.Windows</RootNamespace>
+    <Product>MLV Drive</Product>
+    <Description>Shows Magic Lantern MLV clips as CinemaDNG on a virtual drive for DaVinci Resolve.</Description>
+    <Version>0.1.0</Version>
+    <!-- Publishing: one self-contained exe, no .NET install needed on the user's PC. -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>embedded</DebugType>
   </PropertyGroup>
 
 </Project>
