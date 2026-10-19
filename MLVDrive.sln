@@ -7,6 +7,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{8635D791-DB5
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MlvDrive.Windows", "src\MlvDrive.Windows\MlvDrive.Windows.csproj", "{4B74E25B-2E88-4AA6-A57C-9EF3744787A7}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MlvDrive.Fuse", "src\MlvDrive.Fuse\MlvDrive.Fuse.csproj", "{D182E434-06CC-46A5-A9D9-A8A0D82FCB46}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -20,8 +22,13 @@ Global
 		{4B74E25B-2E88-4AA6-A57C-9EF3744787A7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4B74E25B-2E88-4AA6-A57C-9EF3744787A7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4B74E25B-2E88-4AA6-A57C-9EF3744787A7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D182E434-06CC-46A5-A9D9-A8A0D82FCB46}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D182E434-06CC-46A5-A9D9-A8A0D82FCB46}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D182E434-06CC-46A5-A9D9-A8A0D82FCB46}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D182E434-06CC-46A5-A9D9-A8A0D82FCB46}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{4B74E25B-2E88-4AA6-A57C-9EF3744787A7} = {8635D791-DB59-4CF6-9363-75F2949DD83D}
+		{D182E434-06CC-46A5-A9D9-A8A0D82FCB46} = {8635D791-DB59-4CF6-9363-75F2949DD83D}
 	EndGlobalSection
 EndGlobal
