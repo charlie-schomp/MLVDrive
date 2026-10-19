@@ -29,8 +29,12 @@ $Exe        = Join-Path $InstallDir 'MLVDrive.exe'
 function Say($text, $color = 'Gray') { Write-Host $text -ForegroundColor $color }
 
 function Test-WinFsp {
+    # (Strict mode: a missing key or value must be tested for, not read and compared.)
     foreach ($key in 'HKLM:\SOFTWARE\WOW6432Node\WinFsp', 'HKLM:\SOFTWARE\WinFsp') {
-        $dir = (Get-ItemProperty -Path $key -Name InstallDir -ErrorAction SilentlyContinue).InstallDir
+        if (-not (Test-Path $key)) { continue }
+        $props = Get-ItemProperty -Path $key -ErrorAction SilentlyContinue
+        if ($null -eq $props -or -not ($props.PSObject.Properties.Name -contains 'InstallDir')) { continue }
+        $dir = $props.InstallDir
         if ($dir -and (Test-Path (Join-Path $dir 'bin\winfsp-x64.dll'))) { return $true }
     }
     return $false
@@ -56,7 +60,8 @@ function Install-WinFspFromRelease {
         $hash = (Get-FileHash -Algorithm SHA256 -Path $msi).Hash.ToLowerInvariant()
         if ($hash -ne $WinFspMsiSha256) { throw "WinFsp download does not match the expected checksum ($hash). Not installing it." }
         $sig = Get-AuthenticodeSignature -FilePath $msi
-        if ($sig.Status -ne 'Valid' -or -not $sig.SignerCertificate.Subject.StartsWith($WinFspSigner)) {
+        $signer = if ($null -ne $sig.SignerCertificate) { $sig.SignerCertificate.Subject } else { '' }
+        if ($sig.Status -ne 'Valid' -or -not $signer.StartsWith($WinFspSigner)) {
             throw "WinFsp download is not validly signed by its publisher ($($sig.Status)). Not installing it."
         }
         Say 'Checksum and signature verified. Windows will now ask for permission to install WinFsp.' Green
