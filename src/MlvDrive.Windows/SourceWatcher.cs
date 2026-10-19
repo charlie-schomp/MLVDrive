@@ -79,8 +79,11 @@ sealed class SourceWatcher : IDisposable
                 foreach (var gone in _lastRoots.Except(roots)) _cache.Forget(gone);
                 _lastRoots = roots;
 
+                var started = DateTime.UtcNow;
                 var tree = SourceScanner.Build(sources, _cache, s.ScanDepth, cts.Token);
                 if (cts.IsCancellationRequested) return;
+                Log.Write($"scan: {string.Join(", ", sources.Select(x => $"{x.DisplayName}={x.RootPath}"))} -> " +
+                          $"{string.Join(", ", tree.Children().Select(c => c.Name))} ({(DateTime.UtcNow - started).TotalMilliseconds:0} ms)");
                 _onTree(tree, sources);
                 Rewatch(sources);
             }

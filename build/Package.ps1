@@ -21,6 +21,9 @@ dotnet publish src\MlvDrive.Windows -c Release -o "$out\publish"
 if ($LASTEXITCODE) { throw 'publish failed' }
 
 Move-Item "$out\publish\MLVDrive.exe" "$out\MLVDrive.exe"
+Move-Item "$out\publish\winfsp-msil.dll" "$out\winfsp-msil.dll"      # must sit beside the exe (see csproj)
+$left = Get-ChildItem "$out\publish" -File | Where-Object { $_.Extension -ne '.pdb' }
+if ($left) { throw "unexpected published files: $($left.Name -join ', ')" }
 Remove-Item -Recurse -Force "$out\publish"
 New-Item -ItemType Directory -Force "$out\installer" | Out-Null
 Copy-Item installer\INSTALL.cmd, installer\UNINSTALL.cmd $out

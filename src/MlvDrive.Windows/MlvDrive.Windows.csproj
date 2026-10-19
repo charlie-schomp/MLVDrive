@@ -30,4 +30,14 @@
     <DebugType>embedded</DebugType>
   </PropertyGroup>
 
+  <!-- WinFsp's .NET layer checks its own file version at startup (FileVersionInfo of its
+       Assembly.Location), which is empty inside a single-file bundle. Ship it beside the exe. -->
+  <Target Name="KeepWinFspBesideExe" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish Update="@(ResolvedFileToPublish)" Condition="'%(Filename)' == 'winfsp-msil'">
+        <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
+
 </Project>

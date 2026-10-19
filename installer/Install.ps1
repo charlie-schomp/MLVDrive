@@ -79,7 +79,9 @@ try {
     Say '---------------'
 
     $source = Join-Path $PackageDir 'MLVDrive.exe'
-    if (-not (Test-Path $source)) { throw "MLVDrive.exe was not found next to this installer ($PackageDir)." }
+    foreach ($f in 'MLVDrive.exe', 'winfsp-msil.dll') {
+        if (-not (Test-Path (Join-Path $PackageDir $f))) { throw "$f was not found next to this installer ($PackageDir)." }
+    }
 
     if (Test-WinFsp) {
         Say 'WinFsp is already installed.' Green
@@ -94,10 +96,17 @@ try {
     }
 
     # stop a running copy so the exe can be replaced
-    Get-Process -Name 'MLVDrive' -ErrorAction SilentlyContinue | ForEach-Object { $_.CloseMainWindow() | Out-Null; $_.WaitForExit(3000) | Out-Null; if (-not $_.HasExited) { $_.Kill() } }
+    # (a tray app has no main window to close, so it is stopped; WinFsp unmounts its drive)
+    Get-Process -Name 'MLVDrive' -ErrorAction SilentlyContinue | ForEach-Object {
+        Say 'Stopping the running MLV Drive...'
+        $_.Kill()
+        if (-not $_.WaitForExit(10000)) { throw 'MLV Drive is still running; quit it from its tray icon and run setup again.' }
+    }
+    Start-Sleep -Milliseconds 500   # let Windows release the file
 
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
     Copy-Item -Force $source $Exe
+    Copy-Item -Force (Join-Path $PackageDir 'winfsp-msil.dll') (Join-Path $InstallDir 'winfsp-msil.dll')
     foreach ($doc in 'README.md', 'LICENSE') {
         $p = Join-Path $PackageDir $doc
         if (Test-Path $p) { Copy-Item -Force $p (Join-Path $InstallDir $doc) }

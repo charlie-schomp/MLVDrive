@@ -21,6 +21,8 @@ static int Run(string[] args)
             "info" when args.Length >= 2 => Info(args[1]),
             "export" when args.Length >= 3 => Export(args[1], args[2], Option(args, "--fps")),
             "testclip" when args.Length >= 2 => TestClip(args[1], (int)(Option(args, "--bpp") ?? 12)),
+            "tree" when args.Length >= 2 => Tree(args[1]),
+            "bench" when args.Length >= 2 => Bench(args[1]),
             _ => Usage(),
         };
     }
@@ -89,6 +91,41 @@ static int Export(string path, string outDir, double? fps)
         File.WriteAllBytes(Path.Combine(folder, clip.BaseName + ".wav"), bytes);
     }
     Console.WriteLine($"\r{seq.FrameCount} frames -> {folder}{(audio is null ? "" : " (+ wav)")}");
+    return 0;
+}
+
+static int Bench(string path)
+{
+    using var clip = MlvClip.Open(path);
+    var seq = new DngSequence(clip);
+    var buffer = new byte[64 * 1024];
+    int frames = Math.Min(seq.FrameCount, 96);
+    var sw = System.Diagnostics.Stopwatch.StartNew();
+    for (int f = 0; f < frames; f++)
+        for (long pos = 0; pos < seq.FileSize; pos += buffer.Length)
+            seq.Read(f, pos, buffer);
+    double s = sw.Elapsed.TotalSeconds;
+    Console.WriteLine($"{frames} frames in 64 KB reads: {frames / s:0.0} fps ({seq.FileSize * frames / s / 1e6:0} MB/s of DNG, {clip.PackedFrameSize * frames / s / 1e6:0} MB/s from the clip)");
+    return 0;
+}
+
+static int Tree(string root)
+{
+    using var cache = new MlvDrive.Core.VirtualFs.ClipCache();
+    var tree = MlvDrive.Core.VirtualFs.SourceScanner.Build(new[] { new MlvDrive.Core.VirtualFs.ClipSource(Path.GetFileName(Path.TrimEndingDirectorySeparator(root)) is { Length: > 0 } n ? n : "Drive", root) }, cache);
+    void Print(MlvDrive.Core.VirtualFs.VNode node, string indent)
+    {
+        if (node is MlvDrive.Core.VirtualFs.ClipDirectory c)
+        {
+            var files = c.Children();
+            Console.WriteLine($"{indent}{c.Name}\\  ({files.Count(f => f.Name.EndsWith(".dng"))} dng{(files.Any(f => f.Name.EndsWith(".wav")) ? " + wav" : "")}){(c.Problem is { } p ? "  ! " + p : "")}");
+            return;
+        }
+        Console.WriteLine($"{indent}{node.Name}\\");
+        if (node is MlvDrive.Core.VirtualFs.VDirectory d)
+            foreach (var child in d.Children()) Print(child, indent + "  ");
+    }
+    foreach (var top in tree.Children()) Print(top, "");
     return 0;
 }
 

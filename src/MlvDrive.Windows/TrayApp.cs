@@ -53,7 +53,21 @@ sealed class TrayApp : ApplicationContext
         Unmount();
         _drive = new WinFspDrive(root, "MLV Drive");
         _host = new FileSystemHost(_drive) { Prefix = null };
-        int status = _host.Mount(MountPoint, null, false, 0);
+        int status;
+        try
+        {
+            status = _host.Mount(MountPoint, null, false, 0);
+        }
+        catch (Exception ex)
+        {
+            // WinFsp missing or broken: say so instead of disappearing.
+            Log.Write($"mount {MountPoint} failed: {ex}");
+            _status = "WinFsp could not start the drive - see the log.";
+            _host = null;
+            _drive = null;
+            ShowBalloon("MLV Drive", "WinFsp could not start the drive. Run INSTALL.cmd again; details are in the log (tray menu > Open log).", ToolTipIcon.Error);
+            return;
+        }
         if (status != 0)
         {
             Log.Write($"mount {MountPoint} failed: 0x{status:X8}");
