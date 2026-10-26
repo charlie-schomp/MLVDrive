@@ -100,12 +100,12 @@ public class ClipTests
     }
 
     [Fact]
-    public void Lossless_clip_is_reported_unsupported()
+    public void Lzma_clip_is_reported_unsupported()
     {
         using var tmp = new TempDir();
-        var t = new SyntheticClip { VideoClass = 0x21 };
-        using var clip = MlvClip.Open(t.Write(tmp.Path, "LJ", new[] { 1 }));
-        Assert.Contains("lossless", clip.Unsupported);
+        var t = new SyntheticClip { VideoClass = 0x81 };
+        using var clip = MlvClip.Open(t.Write(tmp.Path, "LZ", new[] { 1 }));
+        Assert.Contains("LZMA", clip.Unsupported);
     }
 }
 
@@ -351,13 +351,13 @@ public class TreeTests
     public void Unsupported_clip_explains_itself()
     {
         using var tmp = new TempDir();
-        new SyntheticClip { VideoClass = 0x21 }.Write(tmp.Path, "LJ", new[] { 1 });
+        new SyntheticClip { VideoClass = 0x81 }.Write(tmp.Path, "LZ", new[] { 1 });
         using var cache = new ClipCache();
         var root = SourceScanner.Build(new[] { new ClipSource("D", tmp.Path) }, cache);
-        var note = Assert.IsType<VFile>(Assert.Single(((VDirectory)VirtualPath.Resolve(root, @"D\LJ")!).Children()));
+        var note = Assert.IsType<VFile>(Assert.Single(((VDirectory)VirtualPath.Resolve(root, @"D\LZ")!).Children()));
         var text = new byte[note.Size];
         note.Read(0, text);
-        Assert.Contains("lossless", System.Text.Encoding.UTF8.GetString(text));
+        Assert.Contains("LZMA", System.Text.Encoding.UTF8.GetString(text));
     }
 
     [Fact]

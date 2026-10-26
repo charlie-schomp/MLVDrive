@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Text;
 using MlvDrive.Core.Dng;
+using MlvDrive.Core.Mlv;
 
 namespace MlvDrive.Core.Testing;
 
@@ -17,6 +18,8 @@ public sealed class SyntheticClip
     public int AudioBytesPerPacket = 4800;      // 25 ms of 48 kHz stereo 16-bit
     /// <summary>The 6D Mark II port's INFO "scratch_wav_start_us=N" (v91 on); null writes none.</summary>
     public long? ScratchWavStartUs;
+    /// <summary>Write lossless (LJ92) frames in this layout instead of packed pixels; null for uncompressed.</summary>
+    public Lj92Layout? Lossless;
 
     /// <summary>Optional image: (frame, x, y) to a raw value. Default is a deterministic test pattern.</summary>
     public Func<int, int, int, ushort>? PixelFunction;
@@ -105,7 +108,9 @@ public sealed class SyntheticClip
 
     void Vidf(Stream s, int frameNumber, ulong ts)
     {
-        var px = PixelUnpacker.Pack(FramePixels(frameNumber), Bpp);
+        var px = Lossless is { } layout
+            ? Lj92Writer.EncodeFrame(FramePixels(frameNumber), Width, Height, Bpp, layout)
+            : PixelUnpacker.Pack(FramePixels(frameNumber), Bpp);
         var body = new byte[16 + FrameSpace + px.Length];
         BinaryPrimitives.WriteUInt32LittleEndian(body, (uint)frameNumber);
         BinaryPrimitives.WriteUInt32LittleEndian(body.AsSpan(12), (uint)FrameSpace);
@@ -145,7 +150,7 @@ public sealed class SyntheticClip
         BinaryPrimitives.WriteUInt64LittleEndian(b, 0x1234_5678_9ABC_DEF0);
         BinaryPrimitives.WriteUInt16LittleEndian(b.AsSpan(8), fileNum);
         BinaryPrimitives.WriteUInt16LittleEndian(b.AsSpan(10), fileCount);
-        BinaryPrimitives.WriteUInt16LittleEndian(b.AsSpan(16), VideoClass);
+        BinaryPrimitives.WriteUInt16LittleEndian(b.AsSpan(16), (ushort)(VideoClass | (Lossless is null ? 0 : MlvFormat.VideoClassFlagLj92)));
         BinaryPrimitives.WriteUInt16LittleEndian(b.AsSpan(18), (ushort)(WithAudio ? 1 : 0));
         BinaryPrimitives.WriteUInt32LittleEndian(b.AsSpan(20), frames);
         BinaryPrimitives.WriteUInt32LittleEndian(b.AsSpan(28), FpsNom);

@@ -114,8 +114,6 @@ public sealed class MlvClip : IDisposable
             Unsupported = "not a raw video clip";
         else if (Header.IsLzma)
             Unsupported = "LZMA-compressed clips are not supported";
-        else if (Header.IsLj92)
-            Unsupported = "lossless (LJ92) clips are not supported yet";
         else if (Rawi is null)
             Unsupported = "no RAWI block (frame format unknown)";
         else if (Rawi.Value.BitsPerPixel is < 8 or > 16 || Rawi.Value.XRes <= 0 || Rawi.Value.YRes <= 0)
@@ -123,14 +121,34 @@ public sealed class MlvClip : IDisposable
 
         if (Unsupported is null)
         {
-            long need = PackedFrameSize;
+            long need = Header.IsLj92 ? 1 : PackedFrameSize;          // lossless frames vary in size
             foreach (var f in frames.Values.OrderBy(f => f.FrameNumber))
             {
                 if (f.PayloadSize >= need) _frames.Add(f);
                 else _warnings.Add($"frame {f.FrameNumber} is short ({f.PayloadSize} of {need} bytes), skipped");
             }
+            if (Header.IsLj92 && _frames.Count > 0) CheckLossless();
         }
         _audio.Sort((a, b) => a.Timestamp.CompareTo(b.Timestamp));
+    }
+
+    /// <summary>A lossless clip's first frame must decode to the RAWI frame, sample for sample.</summary>
+    void CheckLossless()
+    {
+        var f = _frames[0];
+        var head = new byte[Math.Min(f.PayloadSize, 64 * 1024)];
+        int got = ReadFile(f.FileIndex, f.PayloadOffset, head);
+        try
+        {
+            var info = Dng.Lj92.ReadInfo(head.AsSpan(0, got));
+            var r = Rawi!.Value;
+            if (info.Samples != (long)r.XRes * r.YRes)
+                Unsupported = $"lossless frames hold {info.Width}x{info.Height}x{info.Components} samples, the clip is {r.XRes}x{r.YRes}";
+        }
+        catch (InvalidDataException e)
+        {
+            Unsupported = $"lossless frames cannot be read ({e.Message})";
+        }
     }
 
     /// <summary>Bytes of packed pixel data in one frame.</summary>

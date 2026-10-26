@@ -68,7 +68,10 @@ Right-click the tray icon:
 - Colour calibration for the Canon bodies Magic Lantern runs on, including the 6D Mark II and
   other DIGIC 6/7/8 cameras. For a camera it doesn't know, it uses the matrix the camera wrote
   into the clip, and otherwise the 5D Mark III's. The log says when that happens.
-- Not yet: lossless (LJ92) or LZMA-compressed clips. Their folders explain this.
+- Lossless (LJ92) raw MLV, as recorded by DIGIC 5 bodies or made by `mlv_dump -c`. Frames are
+  decoded as the editor reads them and shown as the same uncompressed DNGs. Decoding runs
+  about 35-50 frames a second per thread at 2K, and editors read several frames at once.
+- Not yet: LZMA-compressed clips. Their folders explain this.
 
 ## Command line
 

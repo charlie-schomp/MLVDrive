@@ -51,7 +51,7 @@ static int Info(string path, double latencyMs)
     using var clip = MlvClip.Open(path);
     var r = clip.Rawi;
     var (num, den) = clip.FrameRate();
-    Console.WriteLine($"{clip.BaseName}: {clip.FilePaths.Count} file(s), {clip.Frames.Count} frames at {(double)num / den:0.###} fps");
+    Console.WriteLine($"{clip.BaseName}: {clip.FilePaths.Count} file(s), {clip.Frames.Count} frames at {(double)num / den:0.###} fps{(clip.Header.IsLj92 ? ", lossless (LJ92)" : "")}");
     Console.WriteLine($"  camera   {clip.Idnt?.CameraName ?? "?"}");
     if (r is { } ri)
         Console.WriteLine($"  frame    {ri.XRes}x{ri.YRes} {ri.BitsPerPixel}-bit, black {ri.BlackLevel}, white {ri.WhiteLevel}");
@@ -109,7 +109,8 @@ static int Bench(string path)
         for (long pos = 0; pos < seq.FileSize; pos += buffer.Length)
             seq.Read(f, pos, buffer);
     double s = sw.Elapsed.TotalSeconds;
-    Console.WriteLine($"{frames} frames in 64 KB reads: {frames / s:0.0} fps ({seq.FileSize * frames / s / 1e6:0} MB/s of DNG, {clip.PackedFrameSize * frames / s / 1e6:0} MB/s from the clip)");
+    long source = clip.Frames.Take(frames).Sum(f => (long)f.PayloadSize);
+    Console.WriteLine($"{frames} frames in 64 KB reads: {frames / s:0.0} fps ({seq.FileSize * frames / s / 1e6:0} MB/s of DNG, {source / s / 1e6:0} MB/s from the clip{(clip.Header.IsLj92 ? ", lossless" : "")})");
     return 0;
 }
 

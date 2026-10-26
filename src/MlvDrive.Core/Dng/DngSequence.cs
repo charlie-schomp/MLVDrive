@@ -13,7 +13,8 @@ public sealed record DngOptions(double? FrameRateOverride = null, double Scratch
 /// <summary>
 /// A clip presented as a CinemaDNG sequence: one virtual DNG per frame, each a fixed
 /// 64 kB header (as MLVFS uses, which Resolve accepts) followed by the frame unpacked to
-/// 16 bits per pixel. Any byte range of any frame can be read without building the rest.
+/// 16 bits per pixel. Any byte range of any frame can be read without building the rest;
+/// a lossless (LJ92) frame is decoded whole, once, and held in <see cref="DecodedFrames"/>.
 /// </summary>
 public sealed class DngSequence
 {
@@ -73,6 +74,13 @@ public sealed class DngSequence
 
     void ReadPixels(int frame, long imageOffset, Span<byte> destination)
     {
+        if (_clip.Header.IsLj92)
+        {
+            var decoded = DecodedFrames.Get(this, frame, ImageSize, () => DecodeFrame(frame));
+            System.Runtime.InteropServices.MemoryMarshal.AsBytes(decoded.AsSpan()).Slice((int)imageOffset, destination.Length).CopyTo(destination);
+            return;
+        }
+
         int bpp = _rawi.BitsPerPixel;
         var f = _clip.Frames[frame];
         long firstPixel = imageOffset / 2;
@@ -108,6 +116,27 @@ public sealed class DngSequence
             ArrayPool<byte>.Shared.Return(words);
             ArrayPool<ushort>.Shared.Return(pixels);
         }
+    }
+
+    /// <summary>A lossless frame decoded to 16-bit pixels; a damaged frame keeps what decoded and is black after.</summary>
+    ushort[] DecodeFrame(int frame)
+    {
+        var f = _clip.Frames[frame];
+        var pixels = new ushort[(long)_rawi.XRes * _rawi.YRes];
+        var payload = ArrayPool<byte>.Shared.Rent(f.PayloadSize);
+        try
+        {
+            int got = _clip.ReadFile(f.FileIndex, f.PayloadOffset, payload.AsSpan(0, f.PayloadSize));
+            Lj92.Decode(payload.AsSpan(0, got), pixels);
+        }
+        catch (InvalidDataException)
+        {
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(payload);
+        }
+        return pixels;
     }
 
     byte[] GetHeader(int frame)

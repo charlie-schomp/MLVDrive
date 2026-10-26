@@ -97,6 +97,13 @@ public sealed class ClipCache : IDisposable
         public DngSequence? Sequence { get; init; }
         public string? Problem { get; init; }
         public VNode? Lookup(string name) => ByName.GetValueOrDefault(name);
+
+        /// <summary>Close the clip's files and drop its decoded frames.</summary>
+        public void Close()
+        {
+            if (Sequence is not null) DecodedFrames.Forget(Sequence);
+            Clip?.Dispose();
+        }
     }
 
     readonly object _lock = new();
@@ -128,14 +135,14 @@ public sealed class ClipCache : IDisposable
         var built = Build(mlvPath, clipName, sig);
         lock (_lock)
         {
-            if (_entries.Remove(mlvPath, out var old)) { _lru.Remove(mlvPath); old.Clip?.Dispose(); }
+            if (_entries.Remove(mlvPath, out var old)) { _lru.Remove(mlvPath); old.Close(); }
             _entries[mlvPath] = built;
             _lru.AddFirst(mlvPath);
             while (_lru.Count > _capacity)
             {
                 var last = _lru.Last!.Value;
                 _lru.RemoveLast();
-                if (_entries.Remove(last, out var evicted)) evicted.Clip?.Dispose();
+                if (_entries.Remove(last, out var evicted)) evicted.Close();
             }
         }
         return built;
@@ -163,7 +170,7 @@ public sealed class ClipCache : IDisposable
             {
                 _entries.Remove(key, out var e);
                 _lru.Remove(key);
-                e?.Clip?.Dispose();
+                e?.Close();
             }
         }
     }
@@ -173,7 +180,7 @@ public sealed class ClipCache : IDisposable
     {
         lock (_lock)
         {
-            foreach (var e in _entries.Values) e.Clip?.Dispose();
+            foreach (var e in _entries.Values) e.Close();
             _entries.Clear();
             _lru.Clear();
         }
