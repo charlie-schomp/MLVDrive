@@ -81,6 +81,7 @@ Right-click the tray icon:
 mlvdrive info CLIP.MLV
 mlvdrive export CLIP.MLV OUTDIR [--fps 23.976]   write the DNG folder + WAV to disk
 mlvdrive testclip OUTDIR [--bpp 12]              synthetic colour-bar clip for checking an editor
+mlvdrive drift CLIP.MLV [--step 10]              camera clock against the scratch WAV's LTC, through the take
 ```
 
 ## Building

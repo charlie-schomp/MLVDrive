@@ -9,11 +9,13 @@ public static class LtcSignal
     /// <summary>
     /// <paramref name="count"/> samples of LTC whose word for <paramref name="start"/> begins at
     /// sample <paramref name="firstWordAt"/> (earlier words fill in before it).
+    /// <paramref name="recorderPpm"/> makes the recording's clock run fast (positive) against the generator's.
     /// </summary>
-    public static short[] Generate(int count, double firstWordAt, Timecode start, int sampleRate = 48000, short amplitude = 9000)
+    public static short[] Generate(int count, double firstWordAt, Timecode start, int sampleRate = 48000, short amplitude = 9000,
+                                   double recorderPpm = 0)
     {
         var output = new short[count];
-        double samplesPerFrame = (double)sampleRate * start.RateDen / start.RateNum;
+        double samplesPerFrame = (double)sampleRate * start.RateDen / start.RateNum * (1 + recorderPpm * 1e-6);
         double cell = samplesPerFrame / 80;
         short level = amplitude;
         for (long k = -(long)(firstWordAt / samplesPerFrame) - 1; ; k++)

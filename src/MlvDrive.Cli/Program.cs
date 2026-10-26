@@ -9,6 +9,8 @@ using MlvDrive.Core.Testing;
 //   export CLIP.MLV OUTDIR [--fps N] [--latency-ms N]
 //                                       write the clip as a CinemaDNG folder (+ WAV) to disk
 //   testclip OUTDIR [--bpp 12]          write a synthetic colour-bar clip for checking an editor
+//   drift CLIP.MLV|FILE.WAV [--step 10] follow a scratch WAV's LTC through the take: the camera's
+//                                       clock against the timecode generator's as it warms up
 
 return Run(args);
 
@@ -22,6 +24,7 @@ static int Run(string[] args)
             "info" when args.Length >= 2 => Info(args[1], Option(args, "--latency-ms") ?? 0),
             "export" when args.Length >= 3 => Export(args[1], args[2], Option(args, "--fps"), Option(args, "--latency-ms") ?? 0),
             "testclip" when args.Length >= 2 => TestClip(args[1], (int)(Option(args, "--bpp") ?? 12)),
+            "drift" when args.Length >= 2 => Drift(args[1], Option(args, "--step") ?? 10),
             "tree" when args.Length >= 2 => Tree(args[1]),
             "bench" when args.Length >= 2 => Bench(args[1]),
             _ => Usage(),
@@ -36,7 +39,7 @@ static int Run(string[] args)
 
 static int Usage()
 {
-    Console.Error.WriteLine("usage: mlvdrive info CLIP.MLV [--latency-ms N] | export CLIP.MLV OUTDIR [--fps N] [--latency-ms N] | testclip OUTDIR [--bpp 10|12|14]");
+    Console.Error.WriteLine("usage: mlvdrive info CLIP.MLV [--latency-ms N] | export CLIP.MLV OUTDIR [--fps N] [--latency-ms N] | testclip OUTDIR [--bpp 10|12|14] | drift CLIP.MLV|FILE.WAV [--step 10]");
     return 2;
 }
 
@@ -61,6 +64,8 @@ static int Info(string path, double latencyMs)
     Console.WriteLine($"  audio    {(audio is EmbeddedWav w ? $"embedded, {w.Size / 1e6:0.0} MB" : scratch is { } sc ? $"scratch WAV {PassThroughFile.FindScratchWav(path)}, aligned to frame 1 (WAV starts {sc.LeadSeconds:0.000} s earlier)" : audio is not null ? "scratch WAV " + PassThroughFile.FindScratchWav(path) + " (no start time in the clip: shown as recorded)" : "none")}");
     if (scratch?.StartTimecode is { } tc)
         Console.WriteLine($"  timecode {tc} at frame 1 from LTC on the {(scratch.LtcChannel == 0 ? "left" : scratch.LtcChannel == 1 ? "right" : $"#{scratch.LtcChannel + 1}")} channel, {tc.Fps:0.###} fps ({scratch.SubFrame:+0.00;-0.00} frame){(start is null ? " - not used for the DNGs (rate differs)" : "")}");
+    if (scratch?.ClockPpm is { } ppm && scratch.DriftSeconds is { } drift)
+        Console.WriteLine($"  clock    camera {ppm:+0.0;-0.0} ppm against the timecode: {drift * num / den:+0.00;-0.00} frames by the last frame ({drift * 1000:+0.0;-0.0} ms)");
     if (clip.Unsupported is { } why) Console.WriteLine($"  NOT SHOWN: {why}");
     else
     {
@@ -96,6 +101,35 @@ static int Export(string path, string outDir, double? fps, double latencyMs)
     }
     Console.WriteLine($"\r{seq.FrameCount} frames -> {folder}{(audio is null ? "" : " (+ wav)")}");
     return 0;
+}
+
+static int Drift(string path, double step)
+{
+    string wav = path.EndsWith(".MLV", StringComparison.OrdinalIgnoreCase)
+        ? PassThroughFile.FindScratchWav(path) ?? throw new FileNotFoundException("no scratch WAV for " + path)
+        : path;
+    if (ScratchWav.ReadChannels(wav) is not { } w) throw new InvalidDataException(wav + ": not a 16-bit PCM WAV");
+    for (int c = 0; c < w.Channels.Length; c++)
+    {
+        var points = Ltc.Track(w.Channels[c], w.Rate, step);
+        if (points.Count < 2) continue;
+        var first = points[0];
+        Console.WriteLine($"{Path.GetFileName(wav)}: LTC on the {(c == 0 ? "left" : c == 1 ? "right" : $"#{c + 1}")} channel at {first.Tc.Fps:0.###} fps, {points.Count} points");
+        Console.WriteLine("  WAV time   timecode       camera ahead   ppm since last");
+        for (int i = 0; i < points.Count; i++)
+        {
+            var p = points[i];
+            double ahead = (p.RecorderSeconds - first.RecorderSeconds) - (p.TimecodeSeconds - first.TimecodeSeconds);
+            string local = i == 0 ? "" : $"{(((p.RecorderSeconds - points[i - 1].RecorderSeconds) / (p.TimecodeSeconds - points[i - 1].TimecodeSeconds)) - 1) * 1e6,10:+0.0;-0.0}";
+            Console.WriteLine($"  {p.RecorderSeconds,8:0.0} s  {p.Tc}  {ahead * 1000,9:+0.00;-0.00} ms  {local}");
+        }
+        var last = points[^1];
+        double total = (last.RecorderSeconds - first.RecorderSeconds) - (last.TimecodeSeconds - first.TimecodeSeconds);
+        Console.WriteLine($"camera clock {Ltc.ClockPpm(points):+0.0;-0.0} ppm against the timecode (best fit): {total * 1000:+0.0;-0.0} ms over {last.TimecodeSeconds - first.TimecodeSeconds:0} s, {total * first.Tc.Fps:+0.00;-0.00} frames");
+        return 0;
+    }
+    Console.WriteLine($"{Path.GetFileName(wav)}: no LTC on any channel");
+    return 1;
 }
 
 static int Bench(string path)

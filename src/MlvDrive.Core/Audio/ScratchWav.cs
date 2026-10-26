@@ -33,13 +33,22 @@ public sealed class ScratchWav : IVirtualFileContent
     public int LtcChannel { get; } = -1;
     /// <summary>Where the first frame falls between LTC frames (-0.5 .. 0.5).</summary>
     public double SubFrame { get; }
+    /// <summary>
+    /// The camera's clock against the timecode generator's over this take, in parts per million
+    /// (positive: the camera runs fast), from the LTC at the first and the last frame; null
+    /// without LTC at both ends. A crystal drifts as the camera warms; the generator does not.
+    /// </summary>
+    public double? ClockPpm { get; }
+    /// <summary>How far the camera's clock got ahead of the timecode by the end of the take, in seconds.</summary>
+    public double? DriftSeconds { get; }
 
     ScratchWav(string path, byte[] header, long srcData, long srcDataSize, long first, long dataSize,
-               double lead, Timecode? tc, int ltcChannel, double subFrame)
+               double lead, Timecode? tc, int ltcChannel, double subFrame, double? ppm, double? drift)
     {
         _path = path; _header = header; _srcData = srcData; _srcDataSize = srcDataSize;
         _first = first; _dataSize = dataSize;
         LeadSeconds = lead; StartTimecode = tc; LtcChannel = ltcChannel; SubFrame = subFrame;
+        ClockPpm = ppm; DriftSeconds = drift;
     }
 
     /// <summary>
@@ -64,6 +73,7 @@ public sealed class ScratchWav : IVirtualFileContent
         Timecode? tc = null;
         int ltcChannel = -1;
         double sub = 0;
+        double? ppm = null, drift = null;
         if (bits == 16)
         {
             // look a couple of seconds either side of the first frame, every channel
@@ -71,19 +81,51 @@ public sealed class ScratchWav : IVirtualFileContent
             var pcm = ReadPcm(wavPath, dataOffset, dataSize, look0, 5L * rate, channels);
             for (int c = 0; c < channels && tc is null; c++)
             {
-                var ch = new short[pcm.Length / channels];
-                for (int i = 0; i < ch.Length; i++) ch[i] = pcm[i * channels + c];
-                if (Ltc.At(ch, (int)rate, startSample - look0) is { } hit)
+                if (Ltc.At(Channel(pcm, channels, c), (int)rate, startSample - look0) is { } hit)
                 {
                     tc = hit.Tc;
                     sub = hit.Frames - hit.Tc.Frames;
                     ltcChannel = c;
                 }
             }
+
+            // the same at the last frame: how far the camera's clock drifted from the generator's
+            if (tc is { } t0)
+            {
+                long endSample = startSample + samples;
+                long look1 = Math.Max(0, endSample - 3L * rate);
+                var tail = Channel(ReadPcm(wavPath, dataOffset, dataSize, look1, 5L * rate, channels), channels, ltcChannel);
+                if (Ltc.At(tail, (int)rate, endSample - look1) is { } end && (end.Tc.RateNum, end.Tc.RateDen) == (t0.RateNum, t0.RateDen))
+                {
+                    double ltcSeconds = (end.Frames - (t0.Frames + sub)) * t0.RateDen / t0.RateNum;
+                    double cameraSeconds = (double)samples / rate;
+                    double p = (cameraSeconds / ltcSeconds - 1) * 1e6;
+                    if (ltcSeconds > 1 && Math.Abs(p) < 1000)              // not across midnight or a re-jam
+                    {
+                        ppm = p;
+                        drift = cameraSeconds - ltcSeconds;
+                    }
+                }
+            }
         }
 
         var header = BuildHeader(channels, rate, blockAlign, bits, size, tc, clip.BaseName, sub);
-        return new ScratchWav(wavPath, header, dataOffset, dataSize, startSample * blockAlign, size, lead, tc, ltcChannel, sub);
+        return new ScratchWav(wavPath, header, dataOffset, dataSize, startSample * blockAlign, size, lead, tc, ltcChannel, sub, ppm, drift);
+    }
+
+    static short[] Channel(short[] interleaved, int channels, int c)
+    {
+        var ch = new short[interleaved.Length / channels];
+        for (int i = 0; i < ch.Length; i++) ch[i] = interleaved[i * channels + c];
+        return ch;
+    }
+
+    /// <summary>Every channel of a 16-bit PCM WAV, and its sample rate; null if it is not one.</summary>
+    public static (int Rate, short[][] Channels)? ReadChannels(string path)
+    {
+        if (ReadFormat(path) is not { } f || f.Format != 1 || f.Bits != 16 || f.Channels == 0) return null;
+        var pcm = ReadPcm(path, f.DataOffset, f.DataSize, 0, f.DataSize / f.BlockAlign, f.Channels);
+        return ((int)f.Rate, Enumerable.Range(0, f.Channels).Select(c => Channel(pcm, f.Channels, c)).ToArray());
     }
 
     public int Read(long offset, Span<byte> destination)

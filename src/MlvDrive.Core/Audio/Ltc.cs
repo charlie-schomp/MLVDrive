@@ -155,29 +155,64 @@ public static class Ltc
         timebase = timebase <= 24 ? 24 : timebase == 25 ? 25 : 30;
         bool df = words.Count(w => w.DropFrame) > words.Count / 2;
 
-        var spans = new List<int>();
-        int reference = -1;
+        // words confirmed by a neighbour one frame on; the one nearest the point is the anchor
+        long spanSum = 0;
+        int spans = 0, reference = -1;
         for (int i = 0; i + 1 < words.Count; i++)
         {
             var a = words[i]; var b = words[i + 1];
-            if (Timecode.ToFrames(b.H, b.M, b.S, b.F, timebase, df) - Timecode.ToFrames(a.H, a.M, a.S, a.F, timebase, df) == 1)
-            {
-                spans.Add(b.Position - a.Position);
-                if (reference < 0) reference = i;
-            }
+            if (Timecode.ToFrames(b.H, b.M, b.S, b.F, timebase, df) - Timecode.ToFrames(a.H, a.M, a.S, a.F, timebase, df) != 1) continue;
+            spanSum += b.Position - a.Position;
+            spans++;
+            foreach (int k in new[] { i, i + 1 })
+                if (reference < 0 || Math.Abs(words[k].Position - at) < Math.Abs(words[reference].Position - at)) reference = k;
         }
-        if (spans.Count < 3 || reference < 0) return null;
+        if (spans < 3) return null;
 
-        // whole-sample spans round 1601.6 to 1602 - an hour of 29.97 would drift a second;
-        // snap to the exact rate they belong to
-        spans.Sort();
-        var (num, den) = ExactRate((double)sampleRate / spans[spans.Count / 2]);
+        // whole-sample spans are 1601 or 1602 for 1601.6 at 29.97, and the recorder's clock may
+        // be off by some ppm: the mean names the standard rate, whose exact spacing is used
+        // from the anchor (never more than a few frames, so a clock error cannot bend it)
+        var (num, den) = ExactRate((double)sampleRate * spans / spanSum);
         double samplesPerFrame = (double)sampleRate * den / num;
 
         var r = words[reference];
         long n0 = Timecode.ToFrames(r.H, r.M, r.S, r.F, timebase, df);
         double frames = n0 + (at - r.Position) / samplesPerFrame;
         return (new Timecode((long)Math.Round(frames), timebase, df, num, den), frames);
+    }
+
+    /// <summary>A point along a recording: where it is by the recorder's clock, and by the timecode.</summary>
+    public readonly record struct TrackPoint(double RecorderSeconds, double TimecodeSeconds, Timecode Tc);
+
+    /// <summary>
+    /// The timecode every <paramref name="stepSeconds"/> along a whole channel, each point read
+    /// from the LTC around it, so the recorder's clock can be followed against the generator's
+    /// as the camera warms up through a long take.
+    /// </summary>
+    public static List<TrackPoint> Track(ReadOnlySpan<short> channel, int sampleRate, double stepSeconds)
+    {
+        var points = new List<TrackPoint>();
+        long step = Math.Max(sampleRate / 10, (long)(stepSeconds * sampleRate));
+        for (long at = sampleRate; at + sampleRate <= channel.Length; at += step)
+        {
+            long from = at - sampleRate;
+            if (At(channel.Slice((int)from, 2 * sampleRate), sampleRate, at - from) is { } hit)
+                points.Add(new TrackPoint((double)at / sampleRate, hit.Frames * hit.Tc.RateDen / hit.Tc.RateNum, hit.Tc));
+        }
+        return points;
+    }
+
+    /// <summary>
+    /// The recorder's clock against the timecode, in parts per million (positive: the recorder
+    /// runs fast), as the least-squares slope through the points; null for fewer than two.
+    /// </summary>
+    public static double? ClockPpm(IReadOnlyList<TrackPoint> points)
+    {
+        if (points.Count < 2) return null;
+        double mt = points.Average(p => p.TimecodeSeconds), md = points.Average(p => p.RecorderSeconds - p.TimecodeSeconds);
+        double sxy = points.Sum(p => (p.TimecodeSeconds - mt) * (p.RecorderSeconds - p.TimecodeSeconds - md));
+        double sxx = points.Sum(p => (p.TimecodeSeconds - mt) * (p.TimecodeSeconds - mt));
+        return sxx > 0 ? sxy / sxx * 1e6 : null;
     }
 
     /// <summary>The standard rate a measured frame rate belongs to.</summary>

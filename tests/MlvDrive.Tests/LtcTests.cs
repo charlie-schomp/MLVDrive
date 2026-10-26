@@ -36,4 +36,16 @@ public class LtcTests
         Assert.Null(Ltc.At(programme, Rate, 1000));
         Assert.Null(Ltc.At(new short[Rate * 3], Rate, 1000));
     }
+
+    [Fact]
+    public void A_recorder_clock_running_fast_is_followed_through_the_recording()
+    {
+        var start = new Timecode(Timecode.ToFrames(14, 0, 0, 0, 24, false), 24, false, 24000, 1001);
+        var signal = LtcSignal.Generate(Rate * 60, 700, start, recorderPpm: 60);
+        var points = Ltc.Track(signal, Rate, 5);
+        Assert.Equal(12, points.Count);
+        Assert.InRange(Ltc.ClockPpm(points)!.Value, 59, 61);
+        Assert.Equal("14:00:01:00", points[0].Tc.ToString());          // one second in is frame 23.6
+        Assert.Null(Ltc.ClockPpm(points.Take(1).ToList()));
+    }
 }

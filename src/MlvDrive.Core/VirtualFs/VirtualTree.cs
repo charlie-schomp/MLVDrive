@@ -222,8 +222,11 @@ public sealed class ClipCache : IDisposable
             if (audio is not null) list.Add(new VFile($"{clipName}.wav", modified, audio));
 
             string? note = null;
+            var (fpsNum, fpsDen) = clip.FrameRate(Options.FrameRateOverride);
             if (scratch?.StartTimecode is { } ltc && start is null)
                 note = $"scratch WAV timecode runs at {ltc.Fps:0.###} fps, the clip at another rate: DNGs keep their own timecode";
+            else if (scratch?.DriftSeconds is { } drift && Math.Abs(drift * fpsNum / fpsDen) >= 0.25)
+                note = $"camera clock {scratch.ClockPpm:+0.0;-0.0} ppm against the timecode: picture is {drift * fpsNum / fpsDen:+0.00;-0.00} frames off the sound by the last frame";
             else if (seq.ProfileSource == ProfileSource.Fallback)
                 note = $"{clip.Idnt?.CameraName ?? "unknown camera"}: colour matrix unknown, using {seq.Profile.Name}'s";
             else if (clip.Warnings.Count > 0)

@@ -152,6 +152,31 @@ public class ScratchSyncTests
     }
 
     [Fact]
+    public void Camera_clock_drift_against_the_timecode_is_measured_over_the_take()
+    {
+        using var tmp = new TempDir();
+        var video = Path.Combine(tmp.Path, "DCIM", "100CANON");
+        var audio = Path.Combine(tmp.Path, "DCIM", "AUDIO");
+        Directory.CreateDirectory(audio);
+        const int frames = 960;                                                 // 40 s
+        var mlv = new SyntheticClip { Width = 16, Height = 8, ScratchWavStartUs = -1_500_000, FpsNom = 24000, FpsDen = 1001 }
+            .Write(video, "M26-1400", new[] { frames });
+        int n = Rate * 44;
+        var wav = Path.Combine(audio, "M26-1400.WAV");
+        LtcSignal.WriteStereoWav(wav, Pattern(n), LtcSignal.Generate(n, 1000, TenHours, recorderPpm: 300));
+
+        using var clip = MlvClip.Open(mlv);
+        var s = ScratchWav.Create(clip, wav)!;
+        Assert.InRange(s.ClockPpm!.Value, 297, 303);
+        double seconds = frames * 1001 / 24000.0;
+        Assert.InRange(s.DriftSeconds!.Value, seconds * 297e-6, seconds * 303e-6);
+
+        // 12 ms is 0.29 of a frame: the clip folder says so
+        using var cache = new ClipCache();
+        Assert.Contains("ppm against the timecode", cache.Get(mlv, "M26-1400").Problem);
+    }
+
+    [Fact]
     public void Latency_calibration_moves_the_cut()
     {
         using var tmp = new TempDir();
