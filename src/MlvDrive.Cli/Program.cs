@@ -6,7 +6,8 @@ using MlvDrive.Core.Testing;
 
 // mlvdrive: command-line companion to MLV Drive.
 //   info CLIP.MLV                       what the clip contains and how it will be shown
-//   export CLIP.MLV OUTDIR [--fps N]    write the clip as a CinemaDNG folder (+ WAV) to disk
+//   export CLIP.MLV OUTDIR [--fps N] [--latency-ms N]
+//                                       write the clip as a CinemaDNG folder (+ WAV) to disk
 //   testclip OUTDIR [--bpp 12]          write a synthetic colour-bar clip for checking an editor
 
 return Run(args);
@@ -18,8 +19,8 @@ static int Run(string[] args)
     {
         return args[0] switch
         {
-            "info" when args.Length >= 2 => Info(args[1]),
-            "export" when args.Length >= 3 => Export(args[1], args[2], Option(args, "--fps")),
+            "info" when args.Length >= 2 => Info(args[1], Option(args, "--latency-ms") ?? 0),
+            "export" when args.Length >= 3 => Export(args[1], args[2], Option(args, "--fps"), Option(args, "--latency-ms") ?? 0),
             "testclip" when args.Length >= 2 => TestClip(args[1], (int)(Option(args, "--bpp") ?? 12)),
             "tree" when args.Length >= 2 => Tree(args[1]),
             "bench" when args.Length >= 2 => Bench(args[1]),
@@ -35,7 +36,7 @@ static int Run(string[] args)
 
 static int Usage()
 {
-    Console.Error.WriteLine("usage: mlvdrive info CLIP.MLV | export CLIP.MLV OUTDIR [--fps N] | testclip OUTDIR [--bpp 10|12|14]");
+    Console.Error.WriteLine("usage: mlvdrive info CLIP.MLV [--latency-ms N] | export CLIP.MLV OUTDIR [--fps N] [--latency-ms N] | testclip OUTDIR [--bpp 10|12|14]");
     return 2;
 }
 
@@ -45,7 +46,7 @@ static double? Option(string[] args, string name)
     return i >= 0 && i + 1 < args.Length ? double.Parse(args[i + 1], CultureInfo.InvariantCulture) : null;
 }
 
-static int Info(string path)
+static int Info(string path, double latencyMs)
 {
     using var clip = MlvClip.Open(path);
     var r = clip.Rawi;
@@ -56,7 +57,10 @@ static int Info(string path)
         Console.WriteLine($"  frame    {ri.XRes}x{ri.YRes} {ri.BitsPerPixel}-bit, black {ri.BlackLevel}, white {ri.WhiteLevel}");
     if (clip.Expo is { } e) Console.WriteLine($"  exposure ISO {e.IsoValue}, 1/{(e.ShutterMicroseconds > 0 ? 1_000_000.0 / e.ShutterMicroseconds : 0):0}");
     if (clip.Lens is { } l) Console.WriteLine($"  lens     {l.LensName} {l.FocalLength}mm f/{l.ApertureX100 / 100.0:0.0}");
-    Console.WriteLine($"  audio    {(EmbeddedWav.Create(clip) is { } w ? $"embedded, {w.Size / 1e6:0.0} MB" : PassThroughFile.FindScratchWav(path) is { } s ? "scratch WAV " + s : "none")}");
+    var (audio, scratch, start) = ClipAudioSource.For(clip, path, new DngOptions(ScratchLatencyMs: latencyMs));
+    Console.WriteLine($"  audio    {(audio is EmbeddedWav w ? $"embedded, {w.Size / 1e6:0.0} MB" : scratch is { } sc ? $"scratch WAV {PassThroughFile.FindScratchWav(path)}, aligned to frame 1 (WAV starts {sc.LeadSeconds:0.000} s earlier)" : audio is not null ? "scratch WAV " + PassThroughFile.FindScratchWav(path) + " (no start time in the clip: shown as recorded)" : "none")}");
+    if (scratch?.StartTimecode is { } tc)
+        Console.WriteLine($"  timecode {tc} at frame 1 from LTC on the {(scratch.LtcChannel == 0 ? "left" : scratch.LtcChannel == 1 ? "right" : $"#{scratch.LtcChannel + 1}")} channel, {tc.Fps:0.###} fps ({scratch.SubFrame:+0.00;-0.00} frame){(start is null ? " - not used for the DNGs (rate differs)" : "")}");
     if (clip.Unsupported is { } why) Console.WriteLine($"  NOT SHOWN: {why}");
     else
     {
@@ -68,11 +72,13 @@ static int Info(string path)
     return clip.Unsupported is null ? 0 : 1;
 }
 
-static int Export(string path, string outDir, double? fps)
+static int Export(string path, string outDir, double? fps, double latencyMs)
 {
     using var clip = MlvClip.Open(path);
     if (clip.Unsupported is { } why) throw new NotSupportedException(why);
-    var seq = new DngSequence(clip, new DngOptions(fps));
+    var options = new DngOptions(fps, latencyMs);
+    var (audio, _, start) = ClipAudioSource.For(clip, path, options);
+    var seq = new DngSequence(clip, options, start);
     var folder = Path.Combine(outDir, clip.BaseName);
     Directory.CreateDirectory(folder);
     var buffer = new byte[seq.FileSize];
@@ -82,8 +88,6 @@ static int Export(string path, string outDir, double? fps)
         File.WriteAllBytes(Path.Combine(folder, $"{clip.BaseName}_{i:000000}.dng"), buffer);
         if (i % 24 == 0) Console.Write($"\r{i + 1}/{seq.FrameCount}");
     }
-    IVirtualFileContent? audio = EmbeddedWav.Create(clip, fps);
-    if (audio is null && PassThroughFile.FindScratchWav(path) is { } wav) audio = new PassThroughFile(wav);
     if (audio is not null)
     {
         var bytes = new byte[audio.Size];
