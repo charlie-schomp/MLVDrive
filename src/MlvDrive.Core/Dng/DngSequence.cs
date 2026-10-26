@@ -1,11 +1,14 @@
 using System.Buffers;
 using System.Reflection;
+using MlvDrive.Core.Audio;
 using MlvDrive.Core.Mlv;
 
 namespace MlvDrive.Core.Dng;
 
 /// <summary>Options that change what the DNGs say (not the pixels).</summary>
-public sealed record DngOptions(double? FrameRateOverride = null);
+/// <param name="ScratchLatencyMs">Calibration for the 6D Mark II's scratch WAV: how much later its
+/// first sample comes than the moment the camera stamped (see <see cref="ScratchWav"/>).</param>
+public sealed record DngOptions(double? FrameRateOverride = null, double ScratchLatencyMs = 0);
 
 /// <summary>
 /// A clip presented as a CinemaDNG sequence: one virtual DNG per frame, each a fixed

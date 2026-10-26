@@ -210,9 +210,7 @@ public sealed class ClipCache : IDisposable
             var list = new List<VNode>(clip.Frames.Count + 1);
             for (int i = 0; i < clip.Frames.Count; i++)
                 list.Add(new VFile($"{clipName}_{i:000000}.dng", modified, new FrameContent(seq, i)));
-
-            IVirtualFileContent? audio = EmbeddedWav.Create(clip, Options.FrameRateOverride);
-            if (audio is null && PassThroughFile.FindScratchWav(mlvPath) is { } wav) audio = new PassThroughFile(wav);
+            var (audio, _, _) = ClipAudioSource.For(clip, mlvPath, Options);
             if (audio is not null) list.Add(new VFile($"{clipName}.wav", modified, audio));
 
             string? note = null;

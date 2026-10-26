@@ -174,3 +174,31 @@ public sealed class PassThroughFile : IVirtualFileContent
         return null;
     }
 }
+
+/// <summary>Which audio a clip folder shows, and the timecode it gives the DNGs.</summary>
+public static class ClipAudioSource
+{
+    /// <summary>
+    /// Embedded audio if the clip has any; otherwise the 6D Mark II's scratch WAV, lined up
+    /// with the first frame when the clip says when it started (v91 on) and passed through
+    /// unchanged when it does not. The timecode is the scratch WAV's LTC, when it runs at the
+    /// clip's frame rate (a mismatched generator would drift along the clip).
+    /// </summary>
+    public static (IVirtualFileContent? Audio, ScratchWav? Scratch, Timecode? Start) For(MlvClip clip, string mlvPath, Dng.DngOptions options)
+    {
+        IVirtualFileContent? audio = EmbeddedWav.Create(clip, options.FrameRateOverride);
+        if (audio is not null) return (audio, null, null);
+        if (PassThroughFile.FindScratchWav(mlvPath) is not { } wav) return (null, null, null);
+
+        var scratch = ScratchWav.Create(clip, wav, options.FrameRateOverride, options.ScratchLatencyMs);
+        if (scratch is null) return (new PassThroughFile(wav), null, null);
+
+        Timecode? start = null;
+        if (scratch.StartTimecode is { } tc)
+        {
+            var (num, den) = clip.FrameRate(options.FrameRateOverride);
+            if (Math.Abs(tc.Fps - (double)num / den) < 0.001 * tc.Fps) start = tc;
+        }
+        return (scratch, scratch, start);
+    }
+}

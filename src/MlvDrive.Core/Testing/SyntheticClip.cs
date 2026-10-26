@@ -15,6 +15,8 @@ public sealed class SyntheticClip
     public int FrameSpace = 16;                 // alignment padding before each frame's pixels
     public bool WithAudio;
     public int AudioBytesPerPacket = 4800;      // 25 ms of 48 kHz stereo 16-bit
+    /// <summary>The 6D Mark II port's INFO "scratch_wav_start_us=N" (v91 on); null writes none.</summary>
+    public long? ScratchWavStartUs;
 
     /// <summary>Optional image: (frame, x, y) to a raw value. Default is a deterministic test pattern.</summary>
     public Func<int, int, int, ushort>? PixelFunction;
@@ -82,6 +84,12 @@ public sealed class SyntheticClip
                 Block(s, "RTCI", Rtci());
                 Block(s, "WBAL", Wbal());
                 if (WithAudio) Block(s, "WAVI", Wavi());
+                if (ScratchWavStartUs is { } us)
+                {
+                    var text = new byte[48];
+                    Encoding.ASCII.GetBytes($"scratch_wav_start_us={us}").CopyTo(text, 0);
+                    Block(s, "INFO", text);
+                }
             }
             for (int k = 0; k < framesPerFile[fi]; k++, next++)
             {

@@ -29,6 +29,12 @@ public sealed class MlvClip : IDisposable
     public RtciHeader? Rtci { get; private set; }
     public WbalHeader? Wbal { get; private set; }
     public WaviHeader? Wavi { get; private set; }
+    /// <summary>
+    /// The 6D Mark II port (v91 on): when the clip's scratch WAV started, in microseconds on
+    /// the frames' timestamp scale (negative - the WAV starts first). From an INFO block
+    /// "scratch_wav_start_us=N"; null for clips without one.
+    /// </summary>
+    public long? ScratchWavStartUs { get; private set; }
     public IReadOnlyList<FrameRef> Frames => _frames;
     public IReadOnlyList<AudioRef> Audio => _audio;
     /// <summary>Why the clip cannot be shown as DNGs, or null if it can.</summary>
@@ -230,6 +236,13 @@ public sealed class MlvClip : IDisposable
             case "WAVI" when size >= WaviHeader.Size:
                 Wavi ??= WaviHeader.Parse(b);
                 break;
+            case "INFO" when size > MlvFormat.BlockHeaderSize && ScratchWavStartUs is null:
+            {
+                var text = System.Text.Encoding.ASCII.GetString(b[MlvFormat.BlockHeaderSize..Math.Min(size, b.Length)]);
+                var m = System.Text.RegularExpressions.Regex.Match(text, @"scratch_wav_start_us=(-?\d+)");
+                if (m.Success && long.TryParse(m.Groups[1].Value, out long us)) ScratchWavStartUs = us;
+                break;
+            }
         }
     }
 
