@@ -25,6 +25,7 @@ public sealed class DngSequence
     readonly MlvClip _clip;
     readonly RawiHeader _rawi;
     readonly DngOptions _options;
+    readonly Timecode? _start;
     readonly object _cacheLock = new();
     readonly (int Frame, byte[] Header)[] _headerCache = new (int, byte[])[4];
     int _headerCacheNext;
@@ -35,13 +36,18 @@ public sealed class DngSequence
     public long ImageSize => (long)_rawi.XRes * _rawi.YRes * 2;
     public long FileSize => HeaderSize + ImageSize;
     public MlvClip Clip => _clip;
+    /// <summary>Timecode of the first frame (from LTC in the scratch WAV), or null: frames count from 00:00:00:00.</summary>
+    public Timecode? StartTimecode => _start;
 
-    public DngSequence(MlvClip clip, DngOptions? options = null)
+    /// <param name="startTimecode">Timecode of the first frame - from a Tentacle's LTC in the scratch
+    /// WAV - so the DNGs carry the same timeline as a sound recordist's files.</param>
+    public DngSequence(MlvClip clip, DngOptions? options = null, Timecode? startTimecode = null)
     {
         if (clip.Unsupported is { } why) throw new NotSupportedException(why);
         _clip = clip;
         _rawi = clip.Rawi!.Value;
         _options = options ?? new DngOptions();
+        _start = startTimecode;
         (Profile, ProfileSource) = CameraProfiles.Resolve(clip.Idnt?.CameraName, _rawi.ColorMatrix1, _rawi.CalibrationIlluminant1);
         for (int i = 0; i < _headerCache.Length; i++) _headerCache[i] = (-1, Array.Empty<byte>());
     }
@@ -178,7 +184,8 @@ public sealed class DngSequence
             .Matrix(50721, Profile.ColorMatrix1)
             .Short(50778, (ushort)Profile.Illuminant1)
             .Long(50829, (uint)top, (uint)left, (uint)bottom, (uint)right) // ActiveArea
-            .Bytes(51043, Timecode(frame, fpsNum, fpsDen))           // CinemaDNG TimeCodes
+            .Bytes(51043, _start is { } tc ? TimecodeBytes(tc.Plus(frame))
+                                           : CountTimecode(frame, fpsNum, fpsDen))   // CinemaDNG TimeCodes
             .SRational(51044, (fpsNum, fpsDen))                      // CinemaDNG FrameRate
             .Ascii(51081, clip.BaseName)                             // CinemaDNG ReelName
             .SRational(51109, (0, 1));                               // CinemaDNG BaselineExposureOffset
@@ -229,8 +236,16 @@ public sealed class DngSequence
         return t >= t0 ? start.AddTicks((long)(t - t0) * 10) : start;
     }
 
+    /// <summary>A timecode in the CinemaDNG TimeCodes layout; bit 6 of the frames byte flags drop-frame.</summary>
+    static byte[] TimecodeBytes(Timecode tc)
+    {
+        var (h, m, s, f) = tc.Fields;
+        static byte Bcd(int v) => (byte)((v / 10) << 4 | v % 10);
+        return new[] { (byte)(Bcd(f) & 0x3F | (tc.DropFrame ? 0x40 : 0)), (byte)(Bcd(s) & 0x7F), (byte)(Bcd(m) & 0x7F), (byte)(Bcd(h) & 0x3F), (byte)0, (byte)0, (byte)0, (byte)0 };
+    }
+
     /// <summary>SMPTE timecode in the CinemaDNG TimeCodes layout (BCD frames, seconds, minutes, hours).</summary>
-    static byte[] Timecode(int frame, int fpsNum, int fpsDen)
+    static byte[] CountTimecode(int frame, int fpsNum, int fpsDen)
     {
         double fps = fpsDen == 0 ? 0 : (double)fpsNum / fpsDen;
         int timebase = fps > 1 ? (int)Math.Round(fps) : 1;            // non-integer rates count on the next integer

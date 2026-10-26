@@ -101,7 +101,7 @@ public class ScratchSyncTests
     }
 
     [Fact]
-    public void Clip_folder_shows_the_aligned_scratch()
+    public void Clip_folder_shows_the_aligned_scratch_and_dngs_carry_the_ltc()
     {
         using var tmp = new TempDir();
         var (mlv, _) = Card(tmp.Path, "M26-1302", -1_500_000, TenHours, 1000, ltcOnLeft: true);
@@ -111,6 +111,17 @@ public class ScratchSyncTests
         var head = new byte[200];
         wav.Read(0, head);
         Assert.Contains("bext", System.Text.Encoding.ASCII.GetString(head));
+
+        var start = entry.Sequence!.StartTimecode!.Value;
+        Assert.Equal(start.Frames, (long)Math.Round(TenHours.Frames + (2.5 * Rate - 1000) / Spf2398));
+        foreach (int frame in new[] { 0, 5, 47 })
+        {
+            var dng = new TiffReader(entry.Sequence.BuildHeader(frame));
+            var tc = dng.Ifd0[51043].Value;
+            var (h, m, s, f) = start.Plus(frame).Fields;
+            static int Bcd(byte b) => (b >> 4) * 10 + (b & 15);
+            Assert.Equal((f, s, m, h), (Bcd((byte)(tc[0] & 0x3F)), Bcd(tc[1]), Bcd(tc[2]), Bcd(tc[3])));
+        }
     }
 
     [Fact]
@@ -124,10 +135,12 @@ public class ScratchSyncTests
         Assert.Null(scratch);
         Assert.Null(start);
         Assert.Equal(File.ReadAllBytes(wavPath), ReadAll(audio!));
+        var dng = new TiffReader(new DngSequence(clip).BuildHeader(0));
+        Assert.Equal(new byte[] { 0, 0, 0, 0 }, dng.Ifd0[51043].Value[..4]);
     }
 
     [Fact]
-    public void Ltc_at_another_rate_stamps_the_wav_but_is_not_the_clips_timecode()
+    public void Ltc_at_another_rate_stamps_the_wav_but_not_the_dngs()
     {
         using var tmp = new TempDir();
         var tc25 = new Timecode(Timecode.ToFrames(10, 0, 0, 0, 25, false), 25, false, 25, 1);

@@ -206,15 +206,18 @@ public sealed class ClipCache : IDisposable
             if (clip.Frames.Count == 0)
                 return Problem(sig, clip, $"{Path.GetFileName(mlvPath)}: no complete frames yet", modified);
 
-            var seq = new DngSequence(clip, Options);
+            // audio first: the scratch WAV's LTC is the DNGs' timecode
+            var (audio, scratch, start) = ClipAudioSource.For(clip, mlvPath, Options);
+            var seq = new DngSequence(clip, Options, start);
             var list = new List<VNode>(clip.Frames.Count + 1);
             for (int i = 0; i < clip.Frames.Count; i++)
                 list.Add(new VFile($"{clipName}_{i:000000}.dng", modified, new FrameContent(seq, i)));
-            var (audio, _, _) = ClipAudioSource.For(clip, mlvPath, Options);
             if (audio is not null) list.Add(new VFile($"{clipName}.wav", modified, audio));
 
             string? note = null;
-            if (seq.ProfileSource == ProfileSource.Fallback)
+            if (scratch?.StartTimecode is { } ltc && start is null)
+                note = $"scratch WAV timecode runs at {ltc.Fps:0.###} fps, the clip at another rate: DNGs keep their own timecode";
+            else if (seq.ProfileSource == ProfileSource.Fallback)
                 note = $"{clip.Idnt?.CameraName ?? "unknown camera"}: colour matrix unknown, using {seq.Profile.Name}'s";
             else if (clip.Warnings.Count > 0)
                 note = clip.Warnings[0];
