@@ -20,7 +20,7 @@
     <RootNamespace>MlvDrive.Windows</RootNamespace>
     <Product>MLV Drive</Product>
     <Description>Shows Magic Lantern MLV clips as CinemaDNG on a virtual drive for DaVinci Resolve.</Description>
-    <Version>0.2.1</Version>
+    <Version>0.3.0</Version>
     <!-- Publishing: one self-contained exe, no .NET install needed on the user's PC. -->
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained>
