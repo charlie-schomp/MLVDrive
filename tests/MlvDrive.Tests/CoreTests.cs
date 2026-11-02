@@ -170,10 +170,13 @@ public class DngTests
         Assert.Equal("Canon", tiff.Ascii(271));
         Assert.Equal("Canon EOS 6D Mark II", tiff.Ascii(272));
         Assert.Equal("M08-1651", tiff.Ascii(51081));
-        // 6D Mark II: its own D65 matrix, not the 5D Mark III fallback
-        Assert.Equal(0.6875, tiff.Rationals(50721)[0], 4);
-        Assert.Equal(21u, tiff.Long(50778));
-        Assert.False(tiff.Ifd0.ContainsKey(50722));
+        // 6D Mark II: its own dual-illuminant set (Adobe Standard), not the 5D Mark III fallback
+        Assert.Equal(0.7295, tiff.Rationals(50721)[0], 4);     // ColorMatrix1, standard A
+        Assert.Equal(17u, tiff.Long(50778));
+        Assert.Equal(0.6875, tiff.Rationals(50722)[0], 4);     // ColorMatrix2, D65
+        Assert.Equal(21u, tiff.Long(50779));
+        Assert.Equal(0.5806, tiff.Rationals(50964)[0], 4);     // ForwardMatrix1
+        Assert.Equal(0.5333, tiff.Rationals(50965)[0], 4);     // ForwardMatrix2
         // recorded frame is a crop of the camera buffer: active area is the whole frame
         Assert.Equal(new uint[] { 0, 0, (uint)t.Height, (uint)t.Width },
             Enumerable.Range(0, 4).Select(i => BinaryPrimitives.ReadUInt32LittleEndian(tiff.Ifd0[50829].Value.AsSpan(i * 4))).ToArray());

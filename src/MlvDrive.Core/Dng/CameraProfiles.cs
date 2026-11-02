@@ -100,8 +100,15 @@ public static class CameraProfiles
         // (all positive, not a colour matrix), so only its D65 matrix is kept.
         D65("Canon EOS M", new[] { 6602, -841, -939, -4472, 12458, 2247, -975, 2039, 6148 }),
 
+        // From Adobe's "Canon EOS 6D Mark II Adobe Standard" profile (Camera Raw / Lightroom,
+        // 2017): its D65 matrix is LibRaw's below, which confirms the set.
+        Dual("Canon EOS 6D Mark II",
+            stdA: new[] { 7295, -1664, -669, -4871, 12238, 2980, -585, 1356, 6696 },
+            d65:  new[] { 6875, -970, -932, -4691, 12459, 2501, -874, 1953, 5809 },
+            forwardStdA: new[] { 5806, 2293, 1544, 3687, 5807, 505, 2066, 10, 6176 },
+            forwardD65:  new[] { 5333, 1999, 2311, 3072, 6184, 744, 1433, 24, 6794 }),
+
         // D65 only (LibRaw colordata.cpp).
-        D65("Canon EOS 6D Mark II", new[] { 6875, -970, -932, -4691, 12459, 2501, -874, 1953, 5809 }),
         D65("Canon EOS 5D Mark IV", new[] { 6446, -366, -864, -4436, 12204, 2513, -952, 2496, 6348 }),
         D65("Canon EOS 5DS", new[] { 6250, -711, -808, -5153, 12794, 2636, -1249, 2198, 5610 }, aliases: new[] { "Canon EOS 5DS R" }),
         D65("Canon EOS 7D Mark II", new[] { 7268, -1082, -969, -4186, 11839, 2663, -825, 2029, 5839 }),
