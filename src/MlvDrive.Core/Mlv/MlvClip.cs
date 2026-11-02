@@ -35,6 +35,8 @@ public sealed class MlvClip : IDisposable
     /// "scratch_wav_start_us=N"; null for clips without one.
     /// </summary>
     public long? ScratchWavStartUs { get; private set; }
+    /// <summary>The 6D Mark II port's slate (camera, reel, scene, shot, take), if the clip has one.</summary>
+    public ClipSlate? Slate { get; private set; }
     public IReadOnlyList<FrameRef> Frames => _frames;
     public IReadOnlyList<AudioRef> Audio => _audio;
     /// <summary>Why the clip cannot be shown as DNGs, or null if it can.</summary>
@@ -254,11 +256,12 @@ public sealed class MlvClip : IDisposable
             case "WAVI" when size >= WaviHeader.Size:
                 Wavi ??= WaviHeader.Parse(b);
                 break;
-            case "INFO" when size > MlvFormat.BlockHeaderSize && ScratchWavStartUs is null:
+            case "INFO" when size > MlvFormat.BlockHeaderSize:
             {
                 var text = System.Text.Encoding.ASCII.GetString(b[MlvFormat.BlockHeaderSize..Math.Min(size, b.Length)]);
                 var m = System.Text.RegularExpressions.Regex.Match(text, @"scratch_wav_start_us=(-?\d+)");
-                if (m.Success && long.TryParse(m.Groups[1].Value, out long us)) ScratchWavStartUs = us;
+                if (ScratchWavStartUs is null && m.Success && long.TryParse(m.Groups[1].Value, out long us)) ScratchWavStartUs = us;
+                Slate ??= ClipSlate.Parse(text);
                 break;
             }
         }

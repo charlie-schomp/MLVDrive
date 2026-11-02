@@ -41,6 +41,9 @@ public static class SourceScanner
                 var stem = Path.GetFileNameWithoutExtension(mlv);
                 dir.Add(n => new ClipDirectory(n, mlv, SafeTime(mlv), cache), stem);
             }
+            // every clip's slate, ISO, shutter and lens, for Resolve's Import Metadata
+            // (headers only - the frames are not indexed for this)
+            top.Add(n => new VFile(n, DateTime.UtcNow, new TextContent(Mlv.MetadataCsv.Build(clips))), Mlv.MetadataCsv.FileName);
             SortRecursive(top);
         }
         root.SortChildren();
