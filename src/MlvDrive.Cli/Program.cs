@@ -160,6 +160,11 @@ static int Tree(string root)
             Console.WriteLine($"{indent}{c.Name}\\  ({files.Count(f => f.Name.EndsWith(".dng"))} dng{(files.Any(f => f.Name.EndsWith(".wav")) ? " + wav" : "")}){(c.Problem is { } p ? "  ! " + p : "")}");
             return;
         }
+        if (node is not MlvDrive.Core.VirtualFs.VDirectory)
+        {
+            Console.WriteLine($"{indent}{node.Name}");
+            return;
+        }
         Console.WriteLine($"{indent}{node.Name}\\");
         if (node is MlvDrive.Core.VirtualFs.VDirectory d)
             foreach (var child in d.Children()) Print(child, indent + "  ");
