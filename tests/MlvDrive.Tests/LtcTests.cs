@@ -29,6 +29,15 @@ public class LtcTests
     }
 
     [Fact]
+    public void Quiet_ltc_is_found_after_the_thump_that_opens_a_scratch_wav()
+    {
+        var tc = new Timecode(Timecode.ToFrames(1, 0, 0, 0, 24, false), 24, false, 24000, 1001);
+        var signal = LtcSignal.Generate(Rate * 4, 1000, tc, amplitude: 300);
+        for (int i = 0; i < 200; i++) signal[i] = (short)(i % 2 == 0 ? 4000 : -4000);     // as M03-1203's 4152
+        Assert.NotNull(Ltc.At(signal, Rate, 1000 + 10 * (48000 * 1001 / 24000.0)));
+    }
+
+    [Fact]
     public void Silence_or_programme_audio_has_no_ltc()
     {
         var programme = new short[Rate * 3];

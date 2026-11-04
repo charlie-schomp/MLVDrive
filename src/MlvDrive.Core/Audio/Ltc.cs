@@ -66,8 +66,11 @@ public static class Ltc
         double mean = 0;
         foreach (var x in samples) mean += x;
         mean /= samples.Length;
-        double peak = 1;
-        foreach (var x in samples) peak = Math.Max(peak, Math.Abs(x - mean));
+        // not the very peak: each scratch WAV opens with a thump, up to 10x louder than LTC at a low gain
+        var levels = new int[65537];
+        foreach (var x in samples) levels[Math.Min(65536, (int)Math.Abs(x - mean))]++;
+        int peak = 65536;
+        for (int above = 0; peak > 1 && above + levels[peak] <= samples.Length / 100; peak--) above += levels[peak];
         double hyst = 0.15 * peak;
 
         // transitions, with hysteresis so noise between them is not one
