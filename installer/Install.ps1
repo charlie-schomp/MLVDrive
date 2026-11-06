@@ -35,7 +35,7 @@ function Test-WinFsp {
         $props = Get-ItemProperty -Path $key -ErrorAction SilentlyContinue
         if ($null -eq $props -or -not ($props.PSObject.Properties.Name -contains 'InstallDir')) { continue }
         $dir = $props.InstallDir
-        if ($dir -and (Test-Path (Join-Path $dir 'bin\winfsp-x64.dll'))) { return $true }
+        if ($dir -and (Test-Path (Join-Path $dir 'bin\winfsp-*.dll'))) { return $true }
     }
     return $false
 }

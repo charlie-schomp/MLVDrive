@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["**.md", "installer/mac/README-MAC.txt"]
+  workflow_dispatch:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - run: dotnet build MLVDrive.sln -c Release
+      - run: dotnet test tests/MlvDrive.Tests -c Release --no-build
+
+  # the real thing: mount a clip through each FUSE library and read the frames back
+  mount:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux-libfuse3, os: ubuntu-latest, rid: linux-x64, fuse: fuse3 }
+          - { name: linux-libfuse2, os: ubuntu-latest, rid: linux-x64, fuse: libfuse2t64 }
+          - { name: macos-arm64-fuse-t, os: macos-latest, rid: osx-arm64, fuse: fuse-t }
+    name: mount (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Install FUSE
+        run: |
+          if [ "${{ matrix.fuse }}" = fuse-t ]; then
+            brew install macos-fuse-t/homebrew-cask/fuse-t
+          else
+            sudo apt-get update
+            sudo apt-get install -y fuse3 ${{ matrix.fuse }}
+          fi
+      - name: Force libfuse 2
+        if: matrix.fuse == 'libfuse2t64'
+        run: echo "MLVDRIVE_LIBFUSE=libfuse.so.2" >> "$GITHUB_ENV"
+      - run: dotnet publish src/MlvDrive.Fuse -c Release -r ${{ matrix.rid }} -o out/drive
+      - run: dotnet publish src/MlvDrive.Cli -c Release -r ${{ matrix.rid }} -o out/cli
+      - run: bash build/smoke.sh out/drive/MLVDrive out/cli/mlvdrive-cli

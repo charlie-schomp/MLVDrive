@@ -13,12 +13,12 @@
     <AssemblyName>MLVDrive</AssemblyName>
     <RootNamespace>MlvDrive.Fuse</RootNamespace>
     <Product>MLV Drive</Product>
-    <Version>0.1.0</Version>
     <!-- no ICU dependency: the app has no culture-sensitive text -->
     <InvariantGlobalization>true</InvariantGlobalization>
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <DebugType>embedded</DebugType>
   </PropertyGroup>
 

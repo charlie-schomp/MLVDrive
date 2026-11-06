@@ -1,0 +1,9 @@
+<Project>
+
+  <PropertyGroup>
+    <Version>0.4.0</Version>
+    <!-- lets macOS and Linux restore and build the whole solution -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+
+</Project>

@@ -1,15 +1,16 @@
 # Builds the release zip: tests, publishes one self-contained MLVDrive.exe, and lays out
-#   MLV-Drive-<version>\  INSTALL.cmd  UNINSTALL.cmd  MLVDrive.exe  README.md  LICENSE
-#                         installer\Install.ps1  installer\Uninstall.ps1  SHA256SUMS.txt
-# Usage: powershell -File build\Package.ps1
+#   MLV-Drive-<version>-windows-<arch>\  INSTALL.cmd  UNINSTALL.cmd  MLVDrive.exe  mlvdrive-cli.exe
+#                         README.md  LICENSE  installer\Install.ps1  installer\Uninstall.ps1  SHA256SUMS.txt
+# Usage: powershell -File build\Package.ps1 [-Rid win-arm64]
 
+param([string]$Rid = 'win-x64')
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
-[xml]$proj = Get-Content 'src\MlvDrive.Windows\MlvDrive.Windows.csproj'
-$version = ($proj.Project.PropertyGroup | Where-Object { $_.Version } | Select-Object -First 1).Version
-$name = "MLV-Drive-$version"
+[xml]$props = Get-Content 'Directory.Build.props'
+$version = $props.Project.PropertyGroup.Version
+$name = "MLV-Drive-$version-windows-$($Rid -replace '^win-', '')"
 $out = Join-Path $root "artifacts\$name"
 $zip = Join-Path $root "artifacts\$name.zip"
 
@@ -17,8 +18,12 @@ dotnet test tests\MlvDrive.Tests -c Release
 if ($LASTEXITCODE) { throw 'tests failed' }
 
 Remove-Item -Recurse -Force $out, $zip -ErrorAction SilentlyContinue
-dotnet publish src\MlvDrive.Windows -c Release -o "$out\publish"
+dotnet publish src\MlvDrive.Windows -c Release -r $Rid -o "$out\publish"
 if ($LASTEXITCODE) { throw 'publish failed' }
+dotnet publish src\MlvDrive.Cli -c Release -r $Rid -o "$out\cli"
+if ($LASTEXITCODE) { throw 'publish failed' }
+Move-Item "$out\cli\mlvdrive-cli.exe" "$out\mlvdrive-cli.exe"
+Remove-Item -Recurse -Force "$out\cli"
 
 Move-Item "$out\publish\MLVDrive.exe" "$out\MLVDrive.exe"
 Move-Item "$out\publish\winfsp-msil.dll" "$out\winfsp-msil.dll"      # must sit beside the exe (see csproj)
