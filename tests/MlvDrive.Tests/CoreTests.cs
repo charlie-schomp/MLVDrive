@@ -66,6 +66,18 @@ public class ClipTests
     }
 
     [Fact]
+    public void Lower_case_chunks_are_found()
+    {
+        using var t = new TempDir();
+        var path = new SyntheticClip().Write(t.Path, "M01-0001", new[] { 2, 2 });
+        var chunk = System.IO.Path.ChangeExtension(path, ".M00");
+        File.Move(chunk, chunk + ".tmp");
+        File.Move(chunk + ".tmp", System.IO.Path.ChangeExtension(path, ".m00"));
+        using var clip = MlvClip.Open(path);
+        Assert.Equal(4, clip.Frames.Count);
+    }
+
+    [Fact]
     public void Truncated_clip_keeps_complete_frames()
     {
         using var tmp = new TempDir();
@@ -361,6 +373,43 @@ public class TreeTests
         var text = new byte[note.Size];
         note.Read(0, text);
         Assert.Contains("LZMA", System.Text.Encoding.UTF8.GetString(text));
+    }
+
+    [Fact]
+    public void Macos_sidecar_files_are_not_clips()
+    {
+        using var t = new TempDir();
+        var path = new SyntheticClip().Write(t.Path, "M01-0001", new[] { 2 });
+        File.WriteAllBytes(System.IO.Path.Combine(t.Path, "._M01-0001.MLV"), new byte[4096]);
+        Assert.Equal(new[] { path }, SourceScanner.FindClips(t.Path));
+    }
+
+    [Theory]
+    [InlineData("de-DE")]   // decimal comma
+    [InlineData("th-TH")]   // Buddhist calendar
+    [InlineData("ar-SA")]   // Hijri calendar
+    public void Dng_bytes_do_not_depend_on_the_system_language(string culture)
+    {
+        using var t = new TempDir();
+        new SyntheticClip().Write(t.Path, "M01-0001", new[] { 2 });
+        byte[] Frame()
+        {
+            using var cache = new ClipCache();
+            var tree = SourceScanner.Build(new[] { new ClipSource("D", t.Path) }, cache);
+            var clip = (VDirectory)VirtualPath.Resolve(tree, "D/M01-0001")!;
+            var dng = (VFile)clip.Children().First(c => c.Name.EndsWith(".dng"));
+            var bytes = new byte[dng.Size];
+            dng.Read(0, bytes);
+            return bytes;
+        }
+        var before = System.Globalization.CultureInfo.CurrentCulture;
+        var plain = Frame();
+        try
+        {
+            System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo(culture);
+            Assert.Equal(plain, Frame());
+        }
+        finally { System.Globalization.CultureInfo.CurrentCulture = before; }
     }
 
     [Fact]

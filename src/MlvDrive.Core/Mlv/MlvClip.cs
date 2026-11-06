@@ -84,6 +84,7 @@ public sealed class MlvClip : IDisposable
         for (int i = 0; i < 100; i++)
         {
             var p = Path.Combine(dir, $"{stem}.M{i:00}");
+            if (!File.Exists(p)) p = Path.Combine(dir, $"{stem}.m{i:00}");   // case-sensitive disks
             if (File.Exists(p)) yield return p;
             else yield break;
         }

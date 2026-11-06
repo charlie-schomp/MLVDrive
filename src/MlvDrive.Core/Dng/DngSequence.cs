@@ -237,7 +237,7 @@ public sealed class DngSequence
         if (r.ExposureBiasDen != 0) ifd0.SRational(50730, (r.ExposureBiasNum, r.ExposureBiasDen));
         else ifd0.SRational(50730, (0, 1));
         if (clip.Idnt?.CameraSerial is { Length: > 0 } serial) ifd0.Ascii(50735, serial);
-        if (FrameDateTime(frame) is { } dt) ifd0.Ascii(306, dt.ToString("yyyy:MM:dd HH:mm:ss"));
+        if (FrameDateTime(frame) is { } dt) ifd0.Ascii(306, dt.ToString("yyyy:MM:dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture));
 
         var exif = new TiffIfd().Undefined(36864, "0230"u8.ToArray()); // ExifVersion
         if (clip.Expo is { } expo)

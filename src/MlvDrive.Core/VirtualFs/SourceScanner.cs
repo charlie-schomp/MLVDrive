@@ -62,7 +62,8 @@ public static class SourceScanner
             IEnumerable<string> files, subdirs;
             try
             {
-                files = Directory.EnumerateFiles(dir, "*.*").Where(f => string.Equals(Path.GetExtension(f), ".mlv", StringComparison.OrdinalIgnoreCase)).ToList();
+                // not "._CLIP.MLV": the sidecars macOS leaves on exFAT cards are not clips
+                files = Directory.EnumerateFiles(dir, "*.*").Where(f => string.Equals(Path.GetExtension(f), ".mlv", StringComparison.OrdinalIgnoreCase) && !Path.GetFileName(f).StartsWith('.')).ToList();
                 subdirs = depth < maxDepth ? Directory.EnumerateDirectories(dir).ToList() : Enumerable.Empty<string>();
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
