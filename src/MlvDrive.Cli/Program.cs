@@ -24,7 +24,7 @@ static int Run(string[] args)
         return args[0] switch
         {
             "info" when args.Length >= 2 => Info(args[1], Option(args, "--latency-ms") ?? 0),
-            "export" when args.Length >= 3 => Export(args[1], args[2], Option(args, "--fps"), Option(args, "--latency-ms") ?? 0),
+            "export" when args.Length >= 3 => Export(args[1], args[2], Option(args, "--fps"), Option(args, "--latency-ms") ?? 0, !args.Contains("--no-dual-iso")),
             "testclip" when args.Length >= 2 => TestClip(args[1], (int)(Option(args, "--bpp") ?? 12)),
             "drift" when args.Length >= 2 => Drift(args[1], Option(args, "--step") ?? 10),
             "tree" when args.Length >= 2 => Tree(args[1]),
@@ -41,7 +41,7 @@ static int Run(string[] args)
 
 static int Usage()
 {
-    Console.Error.WriteLine("usage: mlvdrive-cli info CLIP.MLV [--latency-ms N] | export CLIP.MLV OUTDIR [--fps N] [--latency-ms N] | testclip OUTDIR [--bpp 10|12|14] | drift CLIP.MLV|FILE.WAV [--step 10]");
+    Console.Error.WriteLine("usage: mlvdrive-cli info CLIP.MLV [--latency-ms N] | export CLIP.MLV OUTDIR [--fps N] [--latency-ms N] [--no-dual-iso] | testclip OUTDIR [--bpp 10|12|14] | drift CLIP.MLV|FILE.WAV [--step 10]");
     return 2;
 }
 
@@ -79,13 +79,14 @@ static int Info(string path, double latencyMs)
     return clip.Unsupported is null ? 0 : 1;
 }
 
-static int Export(string path, string outDir, double? fps, double latencyMs)
+static int Export(string path, string outDir, double? fps, double latencyMs, bool mergeDualIso)
 {
     using var clip = MlvClip.Open(path);
     if (clip.Unsupported is { } why) throw new NotSupportedException(why);
-    var options = new DngOptions(fps, latencyMs);
+    var options = new DngOptions(fps, latencyMs, mergeDualIso);
     var (audio, _, start) = ClipAudioSource.For(clip, path, options);
     var seq = new DngSequence(clip, options, start);
+    if (seq.DualIso is { } dual) Console.WriteLine($"Dual ISO: {Math.Log2(dual.Gain):0.00} EV between the rows, merging");
     var folder = Path.Combine(outDir, clip.BaseName);
     Directory.CreateDirectory(folder);
     var buffer = new byte[seq.FileSize];

@@ -33,7 +33,7 @@ sealed class TrayApp : ApplicationContext
     {
         _ui = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
         _settings = Settings.Load();
-        _cache = new ClipCache(new DngOptions(_settings.FrameRateOverride));
+        _cache = new ClipCache(new DngOptions(_settings.FrameRateOverride, MergeDualIso: _settings.MergeDualIso));
 
         _icon = new NotifyIcon { Icon = MakeIcon(), Text = "MLV Drive", Visible = true, ContextMenuStrip = new ContextMenuStrip() };
         _icon.ContextMenuStrip.Opening += (_, _) => BuildMenu(_icon.ContextMenuStrip);
@@ -126,6 +126,7 @@ sealed class TrayApp : ApplicationContext
         foreach (var v in new[] { 23.976, 24, 25, 29.97, 30, 48, 50, 59.94, 60 })
             FpsItem(v.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture), v);
         menu.Items.Add(fps);
+        menu.Items.Add(new ToolStripMenuItem("Merge Dual ISO clips", null, (_, _) => ToggleDualIso()) { Checked = _settings.MergeDualIso });
 
         var letters = new ToolStripMenuItem("Drive letter");
         var used = DriveInfo.GetDrives().Select(d => d.Name[0]).ToHashSet();
@@ -157,11 +158,20 @@ sealed class TrayApp : ApplicationContext
         menu.Items.Add("Quit", null, (_, _) => ExitThread());
     }
 
+    void ToggleDualIso()
+    {
+        _settings.MergeDualIso = !_settings.MergeDualIso;
+        _settings.Save();
+        _cache.Options = new DngOptions(_settings.FrameRateOverride, MergeDualIso: _settings.MergeDualIso);
+        _cache.Clear();
+        _watcher.RequestScan(0);
+    }
+
     void SetFrameRate(double? fps)
     {
         _settings.FrameRateOverride = fps;
         _settings.Save();
-        _cache.Options = new DngOptions(fps);
+        _cache.Options = new DngOptions(fps, MergeDualIso: _settings.MergeDualIso);
         _cache.Clear();
         _watcher.RequestScan(0);
     }

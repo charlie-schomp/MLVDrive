@@ -36,6 +36,8 @@ sealed class Settings
     public char DriveLetter { get; set; } = 'M';
     /// <summary>Frames per second written into the DNGs instead of the recorded rate (null = as recorded).</summary>
     public double? FrameRateOverride { get; set; }
+    /// <summary>Blend Dual ISO clips into one exposure.</summary>
+    public bool MergeDualIso { get; set; } = true;
     /// <summary>Folders to show in addition to removable and non-system drives.</summary>
     public List<string> ExtraFolders { get; set; } = new();
     /// <summary>Also look on the Windows drive (slow to scan, off by default).</summary>

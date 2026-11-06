@@ -11,7 +11,8 @@ namespace MlvDrive.Core.Dng;
 /// <summary>Options that change what the DNGs say (not the pixels).</summary>
 /// <param name="ScratchLatencyMs">Calibration for the 6D Mark II's scratch WAV: how much later its
 /// first sample comes than the moment the camera stamped (see <see cref="ScratchWav"/>).</param>
-public sealed record DngOptions(double? FrameRateOverride = null, double ScratchLatencyMs = 0);
+/// <param name="MergeDualIso">Blend Dual ISO clips into one exposure, rather than showing their line pairs.</param>
+public sealed record DngOptions(double? FrameRateOverride = null, double ScratchLatencyMs = 0, bool MergeDualIso = true);
 
 /// <summary>
 /// A clip presented as a CinemaDNG sequence: one virtual DNG per frame, each a fixed
@@ -33,6 +34,10 @@ public sealed class DngSequence
     readonly object _cacheLock = new();
     readonly (int Frame, byte[] Header)[] _headerCache = new (int, byte[])[4];
     int _headerCacheNext;
+    readonly Lazy<DualIsoInfo?> _dualIso;
+
+    /// <summary>The clip's Dual ISO pattern, if it has one and it is being merged. Reads a frame the first time.</summary>
+    public DualIsoInfo? DualIso => _dualIso.Value;
 
     public CameraProfile Profile { get; }
     public ProfileSource ProfileSource { get; }
@@ -54,6 +59,7 @@ public sealed class DngSequence
         _start = startTimecode;
         (Profile, ProfileSource) = CameraProfiles.Resolve(clip.Idnt?.CameraName, _rawi.ColorMatrix1, _rawi.CalibrationIlluminant1);
         for (int i = 0; i < _headerCache.Length; i++) _headerCache[i] = (-1, Array.Empty<byte>());
+        _dualIso = new Lazy<DualIsoInfo?>(MeasureDualIso);
     }
 
     /// <summary>Read part of frame <paramref name="frame"/>'s DNG. Returns the bytes written.</summary>
@@ -77,9 +83,9 @@ public sealed class DngSequence
 
     void ReadPixels(int frame, long imageOffset, Span<byte> destination)
     {
-        if (_clip.Header.IsLj92)
+        if (_clip.Header.IsLj92 || DualIso is not null)
         {
-            var decoded = DecodedFrames.Get(this, frame, ImageSize, () => DecodeFrame(frame));
+            var decoded = DecodedFrames.Get(this, frame, ImageSize, () => BuildFrame(frame));
             System.Runtime.InteropServices.MemoryMarshal.AsBytes(decoded.AsSpan()).Slice((int)imageOffset, destination.Length).CopyTo(destination);
             return;
         }
@@ -121,11 +127,41 @@ public sealed class DngSequence
         }
     }
 
-    /// <summary>A lossless frame decoded to 16-bit pixels; a damaged frame keeps what decoded and is black after.</summary>
+    /// <summary>The clip header only says the module was on; the frames say whether it did anything.</summary>
+    DualIsoInfo? MeasureDualIso()
+    {
+        if (!_options.MergeDualIso || _clip.Diso is not { DualMode: not 0 } || FrameCount == 0) return null;
+        return Dng.DualIso.Measure(DecodeFrame(FrameCount / 2), _rawi.XRes, _rawi.YRes, _rawi.BlackLevel, _rawi.WhiteLevel);
+    }
+
+    ushort[] BuildFrame(int frame)
+    {
+        var pixels = DecodeFrame(frame);
+        if (DualIso is { } info) Dng.DualIso.Merge(pixels, _rawi.XRes, _rawi.YRes, _rawi.BlackLevel, _rawi.WhiteLevel, info);
+        return pixels;
+    }
+
+    /// <summary>A frame as recorded, in 16-bit pixels; a damaged lossless frame keeps what decoded and is black after.</summary>
     ushort[] DecodeFrame(int frame)
     {
         var f = _clip.Frames[frame];
         var pixels = new ushort[(long)_rawi.XRes * _rawi.YRes];
+        if (!_clip.Header.IsLj92)
+        {
+            int byteCount = (int)PixelUnpacker.WordSpan(0, pixels.Length, _rawi.BitsPerPixel) * 2;
+            var packed = ArrayPool<byte>.Shared.Rent(byteCount);
+            try
+            {
+                int read = _clip.ReadFile(f.FileIndex, f.PayloadOffset, packed.AsSpan(0, Math.Min(byteCount, f.PayloadSize)));
+                packed.AsSpan(read, byteCount - read).Clear();
+                PixelUnpacker.Unpack(packed.AsSpan(0, byteCount), _rawi.BitsPerPixel, 0, pixels.Length, pixels);
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(packed);
+            }
+            return pixels;
+        }
         var payload = ArrayPool<byte>.Shared.Rent(f.PayloadSize);
         try
         {
@@ -187,6 +223,7 @@ public sealed class DngSequence
         var cfa = BitConverter.GetBytes(r.CfaPattern);
         if (cfa.Any(b => b > 2) || r.CfaPattern == 0) cfa = new byte[] { 0, 1, 1, 2 };
 
+        uint levelScale = DualIso is not null ? (uint)Dng.DualIso.OutputScale(r.WhiteLevel) : 1;
         var ifd0 = new TiffIfd()
             .Long(254, 0)                                            // NewSubFileType: main image
             .Long(256, (uint)r.XRes)
@@ -208,8 +245,8 @@ public sealed class DngSequence
             .Bytes(50706, 1, 4, 0, 0)                                // DNGVersion 1.4
             .Bytes(50707, 1, 1, 0, 0)                                // DNGBackwardVersion 1.1
             .Ascii(50708, model)                                     // UniqueCameraModel
-            .Long(50714, (uint)Math.Max(0, r.BlackLevel))
-            .Long(50717, (uint)Math.Max(1, r.WhiteLevel))
+            .Long(50714, (uint)Math.Max(0, r.BlackLevel) * levelScale)
+            .Long(50717, (uint)Math.Max(1, r.WhiteLevel) * levelScale)
             .Rational(50718, scaleH, scaleV)                         // DefaultScale
             .Long(50719, 0, 0)                                       // DefaultCropOrigin (in active area)
             .Long(50720, (uint)(right - left), (uint)(bottom - top)) // DefaultCropSize

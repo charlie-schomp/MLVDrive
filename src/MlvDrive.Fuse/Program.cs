@@ -8,12 +8,12 @@ using MlvDrive.Fuse;
 // MLV Drive for macOS (and Linux): MLV clips on every mounted volume, shown as CinemaDNG
 // folders under one mount point (default ~/MLV Drive), read-only, until Ctrl+C.
 //
-//   MLVDrive [--mount DIR] [--folder DIR]... [--no-volumes] [--fps N]
+//   MLVDrive [--mount DIR] [--folder DIR]... [--no-volumes] [--no-dual-iso] [--fps N]
 
 var opts = Options.Parse(args);
 if (opts is null)
 {
-    Console.Error.WriteLine("usage: MLVDrive [--mount DIR] [--folder DIR]... [--no-volumes] [--fps N]");
+    Console.Error.WriteLine("usage: MLVDrive [--mount DIR] [--folder DIR]... [--no-volumes] [--no-dual-iso] [--fps N]");
     return 2;
 }
 
@@ -33,7 +33,7 @@ if (Directory.EnumerateFileSystemEntries(opts.MountPoint).Any())
     return 1;
 }
 
-using var cache = new ClipCache(new DngOptions(opts.Fps));
+using var cache = new ClipCache(new DngOptions(opts.Fps, MergeDualIso: opts.MergeDualIso));
 using var watcher = new UnixSourceWatcher(opts, cache, tree => Fuse2.SetRoot(tree));
 watcher.Start();
 using var release = new Timer(_ => cache.ReleaseIdle(TimeSpan.FromSeconds(10)), null, 5000, 5000);
@@ -69,7 +69,7 @@ foreach (var o in attempts)
 Log.Write($"stopped (code {result})");
 return result;
 
-sealed record Options(string MountPoint, List<string> Folders, bool Volumes, double? Fps)
+sealed record Options(string MountPoint, List<string> Folders, bool Volumes, double? Fps, bool MergeDualIso = true)
 {
     public static Options? Parse(string[] args)
     {
@@ -83,6 +83,7 @@ sealed record Options(string MountPoint, List<string> Folders, bool Volumes, dou
                 case "--mount" when Next() is { } m: o = o with { MountPoint = Path.GetFullPath(m) }; break;
                 case "--folder" when Next() is { } f: o.Folders.Add(Path.GetFullPath(f)); break;
                 case "--no-volumes": o = o with { Volumes = false }; break;
+                case "--no-dual-iso": o = o with { MergeDualIso = false }; break;
                 case "--fps" when Next() is { } v && double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var fps): o = o with { Fps = fps }; break;
                 default: return null;
             }

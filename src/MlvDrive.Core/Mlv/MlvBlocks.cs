@@ -108,6 +108,16 @@ public readonly record struct ExpoHeader(uint IsoMode, uint IsoValue, uint IsoAn
         BinaryPrimitives.ReadUInt64LittleEndian(b[32..]));
 }
 
+/// <summary>DISO: whether the dual_iso module was active when the clip was recorded.</summary>
+public readonly record struct DisoHeader(uint DualMode, uint IsoValue)
+{
+    public const int Size = 16 + 8;
+
+    public static DisoHeader Parse(ReadOnlySpan<byte> b) => new(
+        BinaryPrimitives.ReadUInt32LittleEndian(b[16..]),
+        BinaryPrimitives.ReadUInt32LittleEndian(b[20..]));
+}
+
 public readonly record struct LensHeader(ushort FocalLength, ushort FocalDistance, ushort ApertureX100, string LensName)
 {
     public const int Size = 16 + 16 + 64;

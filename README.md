@@ -60,6 +60,7 @@ MLV Drive then runs in the system tray and shows your clips on **M:**. Right-cli
 
 - **Open drive** and **Look for clips again**
 - **Frame rate in DNGs**, for clips whose recorded rate is wrong
+- **Merge Dual ISO clips**
 - **Drive letter**
 - **Also show a folder...**, for folders on the Windows drive, which isn't scanned by default
 - **Start with Windows**, **Notifications** and **Open log**
@@ -105,7 +106,7 @@ Ctrl+C to stop.
 ## Options (macOS and Linux)
 
 ```
-MLVDrive [--mount DIR] [--folder DIR]... [--no-volumes] [--fps N]
+MLVDrive [--mount DIR] [--folder DIR]... [--no-volumes] [--no-dual-iso] [--fps N]
 ```
 
 | Option | What it does |
@@ -113,6 +114,7 @@ MLVDrive [--mount DIR] [--folder DIR]... [--no-volumes] [--fps N]
 | `--mount DIR` | Where the drive appears |
 | `--folder DIR` | Also show this folder. You can repeat it |
 | `--no-volumes` | Show only `--folder` folders, not every mounted drive |
+| `--no-dual-iso` | Show Dual ISO clips with their line pairs, unmerged |
 | `--fps N` | Override the frame rate written into the DNGs |
 
 Set `MLVDRIVE_LIBFUSE` to a library's path to choose which FUSE library is used.
@@ -127,8 +129,10 @@ Set `MLVDRIVE_LIBFUSE` to a library's path to choose which FUSE library is used.
 - Colour calibration for the Canon bodies Magic Lantern runs on, including DIGIC 6, 7 and 8. For a
   camera it doesn't know, it uses the matrix in the clip, or failing that the 5D Mark III's.
 - **Not yet:** LZMA-compressed clips.
-- **Dual ISO:** not processed. Those clips open with their alternating bright and dark line pairs. Process them in
-  [MLV App](https://mlv.app) instead.
+- **Dual ISO:** merged into one exposure as the frames are read, with more highlight and shadow range than either ISO
+  alone. It measures each clip's line pairs from the footage. This first version smooths every row to avoid scan lines, so
+  fine detail loses some vertical sharpness. For the highest quality, use
+  [MLV App](https://mlv.app). Turn it off with the tray menu's **Merge Dual ISO clips**, or `--no-dual-iso`.
 - **Focus pixels:** not corrected. A flat test take from the 6D Mark II's 1080p mode showed no focus-pixel pattern,
   but bodies that record one will show it.
 
@@ -141,7 +145,7 @@ install a driver, `export` writes real files instead.
 
 ```
 mlvdrive-cli info CLIP.MLV                         what's in a clip
-mlvdrive-cli export CLIP.MLV OUTDIR [--fps 23.976]  write the DNG folder and WAV to disk
+mlvdrive-cli export CLIP.MLV OUTDIR [--fps 23.976] [--no-dual-iso]  write the DNG folder and WAV to disk
 mlvdrive-cli testclip OUTDIR [--bpp 12]             make a colour-bar clip for checking an editor
 mlvdrive-cli drift CLIP.MLV [--step 10]             camera clock against the scratch WAV's LTC
 ```

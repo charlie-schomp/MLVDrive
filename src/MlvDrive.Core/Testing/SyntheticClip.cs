@@ -17,6 +17,8 @@ public sealed class SyntheticClip
     public uint WbMode = 9, Kelvin = 5600;
     public int FrameSpace = 16;                 // alignment padding before each frame's pixels
     public bool WithAudio;
+    /// <summary>The DISO block's dualMode; null writes no block.</summary>
+    public uint? DualMode;
     public int AudioBytesPerPacket = 4800;      // 25 ms of 48 kHz stereo 16-bit
     /// <summary>The 6D Mark II port's INFO "scratch_wav_start_us=N" (v91 on); null writes none.</summary>
     public long? ScratchWavStartUs;
@@ -89,6 +91,12 @@ public sealed class SyntheticClip
                 Block(s, "RTCI", Rtci());
                 Block(s, "WBAL", Wbal());
                 if (WithAudio) Block(s, "WAVI", Wavi());
+                if (DualMode is { } mode)
+                {
+                    var diso = new byte[8];
+                    BinaryPrimitives.WriteUInt32LittleEndian(diso, mode);
+                    Block(s, "DISO", diso);
+                }
                 if (ScratchWavStartUs is { } us)
                 {
                     var text = new byte[48];

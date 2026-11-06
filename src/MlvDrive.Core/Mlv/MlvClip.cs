@@ -27,6 +27,7 @@ public sealed class MlvClip : IDisposable
     public RawiHeader? Rawi { get; private set; }
     public IdntHeader? Idnt { get; private set; }
     public ExpoHeader? Expo { get; private set; }
+    public DisoHeader? Diso { get; private set; }
     public LensHeader? Lens { get; private set; }
     public RtciHeader? Rtci { get; private set; }
     public WbalHeader? Wbal { get; private set; }
@@ -246,6 +247,9 @@ public sealed class MlvClip : IDisposable
                 break;
             case "EXPO" when size >= ExpoHeader.Size:
                 Expo ??= ExpoHeader.Parse(b);
+                break;
+            case "DISO" when size >= DisoHeader.Size:
+                Diso ??= DisoHeader.Parse(b);
                 break;
             case "LENS" when size >= LensHeader.Size:
                 Lens ??= LensHeader.Parse(b);
