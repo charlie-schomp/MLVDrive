@@ -29,7 +29,9 @@ jobs:
         include:
           - { name: linux-libfuse3, os: ubuntu-latest, rid: linux-x64, fuse: fuse3 }
           - { name: linux-libfuse2, os: ubuntu-latest, rid: linux-x64, fuse: libfuse2t64 }
+          - { name: linux-arm64-libfuse3, os: ubuntu-24.04-arm, rid: linux-arm64, fuse: fuse3 }
           - { name: macos-arm64-fuse-t, os: macos-latest, rid: osx-arm64, fuse: fuse-t }
+          - { name: macos-intel-fuse-t, os: macos-15-intel, rid: osx-x64, fuse: fuse-t }
     name: mount (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
     steps:
