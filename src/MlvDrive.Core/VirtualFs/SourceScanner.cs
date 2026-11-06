@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2026 charlie-schomp
 namespace MlvDrive.Core.VirtualFs;
 
 /// <summary>A place to look for clips, shown on the virtual drive under <see cref="DisplayName"/>.</summary>

@@ -127,6 +127,10 @@ Set `MLVDRIVE_LIBFUSE` to a library's path to choose which FUSE library is used.
 - Colour calibration for the Canon bodies Magic Lantern runs on, including DIGIC 6, 7 and 8. For a
   camera it doesn't know, it uses the matrix in the clip, or failing that the 5D Mark III's.
 - **Not yet:** LZMA-compressed clips.
+- **Dual ISO:** not processed. Those clips open with their alternating bright and dark line pairs. Process them in
+  [MLV App](https://mlv.app) instead.
+- **Focus pixels:** not corrected. A flat test take from the 6D Mark II's 1080p mode showed no focus-pixel pattern,
+  but bodies that record one will show it.
 
 A clip that can't be shown has a `_why-is-this-empty.txt` in its folder saying why.
 
@@ -151,6 +155,7 @@ mlvdrive-cli drift CLIP.MLV [--step 10]             camera clock against the scr
 | "Safely remove" says the drive is busy | Close the clips in Resolve. MLV Drive lets go of a clip about 10 seconds after the last read |
 | M: is already taken | Tray menu > **Drive letter** |
 | The folder "is not empty" on macOS or Linux | Stop the other copy, or choose another `--mount` folder |
+| A clip's folder says "no complete frames" | The take stopped before its first frame was saved, so the clip is empty. A 1 KB `.MLV` confirms it |
 | Linux or macOS says it needs FUSE | Install it as shown above, or set `MLVDRIVE_LIBFUSE` |
 | macOS says the app "cannot be opened" | Run `codesign --force --sign - bin/arm64/MLVDrive` in the download folder (`bin/x64` on Intel) |
 | The colours look wrong | Check the log, which says when a camera wasn't recognised |
@@ -172,15 +177,23 @@ dotnet test tests/MlvDrive.Tests
 | macOS and Linux packages (any OS, Python 3) | `python3 build/PackageUnix.py` |
 | Mount a test clip and check it byte for byte | `bash build/smoke.sh MLVDRIVE_BINARY CLI_BINARY` |
 
+Each release is built from a tagged commit, so its exact source is on the
+[releases page](https://github.com/charlie-schomp/MLVDrive/releases).
+
 The code is split into `src/MlvDrive.Core` (reading MLV, writing DNG, no platform code),
 `src/MlvDrive.Windows` (WinFsp and the tray app), `src/MlvDrive.Fuse` (macOS and Linux) and
 `src/MlvDrive.Cli`.
 
 ## Credits and licence
 
-GPL v2. The DNG tag layout, the colour matrices of older Canon bodies (credited there to Andy600,
+GNU GPL, version 2 or later (`GPL-2.0-or-later`); see [LICENSE](LICENSE) and
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
+**WinFsp - Windows File System Proxy, Copyright (C) Bill Zissimopoulos**: <https://github.com/winfsp/winfsp>
+
+The DNG tag layout, the colour matrices of older Canon bodies (credited there to Andy600,
 from Adobe DNG Converter) and the white-balance maths come from David Milligan's
-[MLVFS](https://github.com/davidmilligan/MLVFS), which is GPL v2. Newer bodies' matrices are from
+[MLVFS](https://github.com/davidmilligan/MLVFS), which is GPL v2 or later. Newer bodies' matrices are from
 [LibRaw](https://github.com/LibRaw/LibRaw). The idea of patching MLVFS for Resolve comes from
 [MLV Resolve FS](https://github.com/SpicyBoi82/MLVS-is-Davinci-Resolve-magic-lantern-); this is a
 separate implementation.

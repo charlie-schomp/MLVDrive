@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright (C) 2026 charlie-schomp
 """Builds the macOS zip and the Linux tarballs, on any OS with the .NET 8 SDK. Exec bits
 survive because the archives are written here, not by the OS.
 Usage: py build/PackageUnix.py"""
@@ -25,6 +27,14 @@ def read(path):
     return data.replace(b"\r\n", b"\n") if path.endswith((".command", ".txt", ".md")) else data
 
 
+def common_docs():
+    # WinFsp's licence is only for the Windows downloads
+    return [(n, read(p), 0o644) for n, p in (
+        ("README.md", "README.md"), ("LICENSE", "LICENSE"), ("THIRD-PARTY-NOTICES.md", "THIRD-PARTY-NOTICES.md"),
+        ("licenses/dotnet-LICENSE.txt", "licenses/dotnet-LICENSE.txt"),
+        ("licenses/dotnet-ThirdPartyNotices.txt", "licenses/dotnet-ThirdPartyNotices.txt"))]
+
+
 def with_sums(files):
     """[(name in the archive, data, mode)], plus SHA256SUMS.txt."""
     sums = "".join(f"{hashlib.sha256(d).hexdigest()}  {n}\n" for n, d, _ in files)
@@ -38,8 +48,7 @@ def mac():
     files = with_sums([
         ("MLV Drive.command", read("installer/mac/MLV Drive.command"), 0o755),
         ("README-MAC.txt", read("installer/mac/README-MAC.txt"), 0o644),
-        ("README.md", read("README.md"), 0o644),
-        ("LICENSE", read("LICENSE"), 0o644),
+        *common_docs(),
         ("bin/arm64/MLVDrive", read(arm_drive), 0o755),
         ("bin/arm64/mlvdrive-cli", read(arm_cli), 0o755),
         ("bin/x64/MLVDrive", read(x64_drive), 0o755),
@@ -62,8 +71,7 @@ def linux(arch, rid):
     files = with_sums([
         ("MLVDrive", read(drive), 0o755),
         ("mlvdrive-cli", read(cli), 0o755),
-        ("README.md", read("README.md"), 0o644),
-        ("LICENSE", read("LICENSE"), 0o644),
+        *common_docs(),
     ])
     out = os.path.join(art, name + ".tar.gz")
     with tarfile.open(out, "w:gz") as t:

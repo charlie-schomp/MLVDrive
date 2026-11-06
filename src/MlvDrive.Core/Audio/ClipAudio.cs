@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2026 charlie-schomp
 using System.Buffers.Binary;
 using MlvDrive.Core.Mlv;
 

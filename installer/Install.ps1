@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright (C) 2026 charlie-schomp
 # MLV Drive installer.
 #
 # Runs as the normal user. The only step that needs administrator rights is installing
@@ -107,10 +109,12 @@ try {
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
     Copy-Item -Force $source $Exe
     Copy-Item -Force (Join-Path $PackageDir 'winfsp-msil.dll') (Join-Path $InstallDir 'winfsp-msil.dll')
-    foreach ($doc in 'README.md', 'LICENSE') {
+    foreach ($doc in 'README.md', 'LICENSE', 'THIRD-PARTY-NOTICES.md') {
         $p = Join-Path $PackageDir $doc
         if (Test-Path $p) { Copy-Item -Force $p (Join-Path $InstallDir $doc) }
     }
+    $lic = Join-Path $PackageDir 'licenses'
+    if (Test-Path $lic) { Copy-Item -Recurse -Force $lic $InstallDir }
     Copy-Item -Force (Join-Path $PSScriptRoot 'Uninstall.ps1') (Join-Path $InstallDir 'Uninstall.ps1')
     Say "Installed to $InstallDir" Green
 

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2026 charlie-schomp
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -150,6 +152,7 @@ sealed class TrayApp : ApplicationContext
         menu.Items.Add(new ToolStripMenuItem("Start with Windows", null, (_, _) => ToggleAutostart()) { Checked = autostart });
         menu.Items.Add(new ToolStripMenuItem("Notifications", null, (_, _) => { _settings.ShowNotifications ^= true; _settings.Save(); }) { Checked = _settings.ShowNotifications });
         menu.Items.Add("Open log", null, (_, _) => Shell(Log.FilePath));
+        menu.Items.Add("About MLV Drive", null, (_, _) => ShowAbout());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Quit", null, (_, _) => ExitThread());
     }
@@ -195,6 +198,15 @@ sealed class TrayApp : ApplicationContext
         try { Autostart.Enabled = !Autostart.Enabled; }
         catch (Exception ex) { Log.Write("autostart: " + ex.Message); }
     }
+
+    static void ShowAbout() => MessageBox.Show(
+        $"MLV Drive {Application.ProductVersion.Split('+')[0]}\n" +
+        "Free software under the GNU GPL, version 2 or later.\n" +
+        "https://github.com/charlie-schomp/MLVDrive\n\n" +
+        "WinFsp - Windows File System Proxy, Copyright (C) Bill Zissimopoulos\n" +
+        "https://github.com/winfsp/winfsp\n\n" +
+        "Other credits: THIRD-PARTY-NOTICES.md, beside the program.",
+        "About MLV Drive", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
     void OpenDrive()
     {

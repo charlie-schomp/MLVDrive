@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2026 charlie-schomp
 namespace MlvDrive.Core.Testing;
 
 /// <summary>How a lossless frame's pixels are laid out as a JPEG image.</summary>

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright (C) 2026 charlie-schomp
 # Builds the release zip: tests, publishes one self-contained MLVDrive.exe, and lays out
 #   MLV-Drive-<version>-windows-<arch>\  INSTALL.cmd  UNINSTALL.cmd  MLVDrive.exe  mlvdrive-cli.exe
 #                         README.md  LICENSE  installer\Install.ps1  installer\Uninstall.ps1  SHA256SUMS.txt
@@ -33,7 +35,9 @@ Remove-Item -Recurse -Force "$out\publish"
 New-Item -ItemType Directory -Force "$out\installer" | Out-Null
 Copy-Item installer\INSTALL.cmd, installer\UNINSTALL.cmd $out
 Copy-Item installer\Install.ps1, installer\Uninstall.ps1 "$out\installer"
-Copy-Item README.md, LICENSE $out
+Copy-Item README.md, LICENSE, THIRD-PARTY-NOTICES.md $out
+New-Item -ItemType Directory -Force "$out\licenses" | Out-Null
+Copy-Item licenses\* "$out\licenses"
 
 $sums = Get-ChildItem -Recurse -File $out | Sort-Object FullName | ForEach-Object {
     '{0}  {1}' -f (Get-FileHash -Algorithm SHA256 $_.FullName).Hash.ToLowerInvariant(), $_.FullName.Substring($out.Length + 1).Replace('\', '/')

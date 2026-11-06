@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright (C) 2026 charlie-schomp
 # Mounts a synthetic clip and checks the frames served through the filesystem against the
 # same clip exported to disk. Needs FUSE; macOS or Linux.
 # Usage: build/smoke.sh MLVDRIVE_BINARY CLI_BINARY

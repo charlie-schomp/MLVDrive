@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright (C) 2026 charlie-schomp
 # MLV Drive for macOS. Shows MLV clips on your volumes as CinemaDNG
 # folders in ~/MLV Drive for DaVinci Resolve. Read-only. Close this window or press
 # Ctrl+C to stop.

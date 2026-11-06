@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2026 charlie-schomp
+// Based in part on MLVFS, Copyright (C) 2014 David Milligan, GPL-2.0-or-later
 using System.Buffers;
 using System.Reflection;
 using MlvDrive.Core.Audio;
