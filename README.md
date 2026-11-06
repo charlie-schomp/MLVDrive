@@ -37,11 +37,12 @@ in the column names Resolve uses for **Import Metadata**.
 |---|---|---|---|
 | **Windows 10/11** (most PCs) | `MLV-Drive-<version>-windows-x64.zip` | WinFsp (the installer offers it) | Used day to day with Resolve |
 | **Windows on ARM** | `MLV-Drive-<version>-windows-arm64.zip` | WinFsp | Built, never run. Please report back |
-| **Mac** (Apple Silicon or Intel) | `MLV-Drive-<version>-macos.zip` | FUSE-T or macFUSE | See [macOS](#macos) |
+| **Mac** (Apple Silicon or Intel) | `MLV-Drive-<version>-macos.zip` | FUSE-T or macFUSE | Mount test passes with FUSE-T; not yet tried with Resolve or macFUSE |
 | **Linux x64** | `MLV-Drive-<version>-linux-x64.tar.gz` | libfuse 3 or 2 | Mount test passes on both; not yet tried with Resolve |
-| **Linux ARM** | `MLV-Drive-<version>-linux-arm64.tar.gz` | libfuse 3 or 2 | Built, never run. Please report back |
+| **Linux ARM** | `MLV-Drive-<version>-linux-arm64.tar.gz` | libfuse 3 or 2 | Mount test passes on libfuse 3; not yet tried with Resolve |
 
-You don't need to install .NET on any of them. Each download also includes a command-line tool
+The mount test mounts a test clip and checks every frame and the audio byte for byte. You don't
+need to install .NET on any of them. Each download also includes a command-line tool
 that needs no drive at all (see [Command line](#command-line)).
 
 ## Windows
@@ -86,8 +87,8 @@ clips in from Resolve's browser rather than Finder. Press Ctrl+C to stop.
 The launcher signs the app for your Mac and clears the download warning, touching only its own
 files. `README-MAC.txt` has more detail.
 
-**How well tested:** the automated tests run on macOS, but MLV Drive hasn't yet been used with
-Resolve on a Mac. If you try it, please report what happens.
+**How well tested:** the mount test passes on Apple Silicon and Intel Macs with FUSE-T, but MLV Drive
+hasn't yet been used with Resolve on a Mac. If you try it, please report what happens.
 
 ## Linux
 

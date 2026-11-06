@@ -1,6 +1,7 @@
 MLV Drive for macOS (Apple Silicon and Intel)
 
-Not yet used with Resolve on a Mac. If you try it, please report what happens.
+The mount test passes on Apple Silicon and Intel with FUSE-T, but this has not yet been
+used with Resolve on a Mac. If you try it, please report what happens.
 
 1. Install FUSE-T (free, no kernel extension, no security changes):
      https://www.fuse-t.org   or   brew install macos-fuse-t/homebrew-cask/fuse-t
