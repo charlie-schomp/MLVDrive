@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2026 charlie-schomp
 using MlvDrive.Core.Audio;
 using MlvDrive.Core.Dng;
 using MlvDrive.Core.Mlv;
@@ -211,7 +213,7 @@ public sealed class ClipCache : IDisposable
             if (clip.Unsupported is { } why)
                 return Problem(sig, clip, $"{Path.GetFileName(mlvPath)}: {why}", modified);
             if (clip.Frames.Count == 0)
-                return Problem(sig, clip, $"{Path.GetFileName(mlvPath)}: no complete frames yet", modified);
+                return Problem(sig, clip, $"{Path.GetFileName(mlvPath)}: no complete frames. The take stopped before its first frame was saved, or the file is still being copied.", modified);
 
             // audio first: the scratch WAV's LTC is the DNGs' timecode
             var (audio, scratch, start) = ClipAudioSource.For(clip, mlvPath, Options);
