@@ -9,6 +9,17 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <AssemblyName>mlvdrive-cli</AssemblyName>
+    <RootNamespace>MlvDrive.Cli</RootNamespace>
+    <Product>MLV Drive</Product>
+    <!-- no ICU dependency: the app has no culture-sensitive text -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Publishing: one small file, no .NET install needed. -->
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <PublishTrimmed>true</PublishTrimmed>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>embedded</DebugType>
   </PropertyGroup>
 
 </Project>

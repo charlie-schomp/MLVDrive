@@ -4,7 +4,7 @@ using MlvDrive.Core.Dng;
 using MlvDrive.Core.Mlv;
 using MlvDrive.Core.Testing;
 
-// mlvdrive: command-line companion to MLV Drive.
+// mlvdrive-cli: command-line companion to MLV Drive.
 //   info CLIP.MLV                       what the clip contains and how it will be shown
 //   export CLIP.MLV OUTDIR [--fps N] [--latency-ms N]
 //                                       write the clip as a CinemaDNG folder (+ WAV) to disk
@@ -39,7 +39,7 @@ static int Run(string[] args)
 
 static int Usage()
 {
-    Console.Error.WriteLine("usage: mlvdrive info CLIP.MLV [--latency-ms N] | export CLIP.MLV OUTDIR [--fps N] [--latency-ms N] | testclip OUTDIR [--bpp 10|12|14] | drift CLIP.MLV|FILE.WAV [--step 10]");
+    Console.Error.WriteLine("usage: mlvdrive-cli info CLIP.MLV [--latency-ms N] | export CLIP.MLV OUTDIR [--fps N] [--latency-ms N] | testclip OUTDIR [--bpp 10|12|14] | drift CLIP.MLV|FILE.WAV [--step 10]");
     return 2;
 }
 
@@ -157,7 +157,7 @@ static int Tree(string root)
         if (node is MlvDrive.Core.VirtualFs.ClipDirectory c)
         {
             var files = c.Children();
-            Console.WriteLine($"{indent}{c.Name}\\  ({files.Count(f => f.Name.EndsWith(".dng"))} dng{(files.Any(f => f.Name.EndsWith(".wav")) ? " + wav" : "")}){(c.Problem is { } p ? "  ! " + p : "")}");
+            Console.WriteLine($"{indent}{c.Name}{Path.DirectorySeparatorChar}  ({files.Count(f => f.Name.EndsWith(".dng"))} dng{(files.Any(f => f.Name.EndsWith(".wav")) ? " + wav" : "")}){(c.Problem is { } p ? "  ! " + p : "")}");
             return;
         }
         if (node is not MlvDrive.Core.VirtualFs.VDirectory)
@@ -165,7 +165,7 @@ static int Tree(string root)
             Console.WriteLine($"{indent}{node.Name}");
             return;
         }
-        Console.WriteLine($"{indent}{node.Name}\\");
+        Console.WriteLine($"{indent}{node.Name}{Path.DirectorySeparatorChar}");
         if (node is MlvDrive.Core.VirtualFs.VDirectory d)
             foreach (var child in d.Children()) Print(child, indent + "  ");
     }
