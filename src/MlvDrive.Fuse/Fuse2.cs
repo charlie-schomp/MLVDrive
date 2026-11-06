@@ -5,12 +5,14 @@ using MlvDrive.Core.VirtualFs;
 namespace MlvDrive.Fuse;
 
 /// <summary>
-/// The virtual drive through the FUSE 2.9 high-level API (path based), which FUSE-T and
-/// macFUSE provide on macOS and libfuse 2 on Linux. Read-only: everything that would
-/// change the drive returns EROFS.
+/// The virtual drive through the FUSE high-level API (path based): 2.9 from FUSE-T and
+/// macFUSE on macOS and libfuse 2 on Linux, or 3.x from libfuse 3 on Linux. Read-only:
+/// everything that would change the drive returns EROFS.
 ///
-/// The only platform-specific parts are the library's location and the layout of
-/// struct stat, which libfuse fills from what getattr writes.
+/// The platform-specific parts are the library's location, the order of struct
+/// fuse_operations, and the layout of struct stat, which libfuse fills from what getattr
+/// writes. FUSE 3 only added trailing arguments to the calls used here: callbacks ignore
+/// them, and the caller cleans up, so one set of callbacks serves both.
 /// </summary>
 static unsafe class Fuse2
 {
@@ -42,9 +44,9 @@ static unsafe class Fuse2
         }
         else
         {
+            yield return "libfuse3.so.4";     // libfuse 3.17 on
+            yield return "libfuse3.so.3";
             yield return "libfuse.so.2";
-            yield return "/usr/lib/x86_64-linux-gnu/libfuse.so.2";
-            yield return "/lib/x86_64-linux-gnu/libfuse.so.2";
         }
     }
 
@@ -65,34 +67,44 @@ static unsafe class Fuse2
         _gid = GetGid();
         var main = Marshal.GetDelegateForFunctionPointer<FuseMainReal>(NativeLibrary.GetExport(library, "fuse_main_real"));
 
-        // struct fuse_operations: the first 38 members are function pointers in this
-        // order in libfuse 2.9, FUSE-T and macFUSE; libfuse copies only op_size bytes.
-        const int OpCount = 38;
+        // struct fuse_operations: function pointers, in an order that differs between FUSE 2
+        // (libfuse 2.9, FUSE-T, macFUSE) and FUSE 3. libfuse copies only op_size bytes.
+        bool fuse3 = OperatingSystem.IsLinux() && NativeLibrary.TryGetExport(library, "fuse_lib_help", out _);
+        int OpCount = fuse3 ? 33 : 38;
         var ops = (IntPtr*)NativeMemory.AllocZeroed((nuint)(OpCount * sizeof(IntPtr)));
-        ops[0] = (IntPtr)(delegate* unmanaged[Cdecl]<byte*, byte*, int>)&GetAttr;
-        ops[3] = (IntPtr)(delegate* unmanaged[Cdecl]<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int>)&ReadOnly; // mknod
-        ops[4] = ops[3];   // mkdir
-        ops[5] = ops[3];   // unlink
-        ops[6] = ops[3];   // rmdir
-        ops[7] = ops[3];   // symlink
-        ops[8] = ops[3];   // rename
-        ops[9] = ops[3];   // link
-        ops[10] = ops[3];  // chmod
-        ops[11] = ops[3];  // chown
-        ops[12] = ops[3];  // truncate
-        ops[13] = ops[3];  // utime
-        ops[14] = (IntPtr)(delegate* unmanaged[Cdecl]<byte*, int*, int>)&Open;
-        ops[15] = (IntPtr)(delegate* unmanaged[Cdecl]<byte*, byte*, nuint, long, IntPtr, int>)&Read;
-        ops[16] = ops[3];  // write
-        ops[19] = (IntPtr)(delegate* unmanaged[Cdecl]<byte*, IntPtr, int>)&Release;
-        ops[21] = ops[3];  // setxattr
-        ops[25] = (IntPtr)(delegate* unmanaged[Cdecl]<byte*, IntPtr, int>)&OpenDir;
-        ops[26] = (IntPtr)(delegate* unmanaged[Cdecl]<byte*, IntPtr, IntPtr, long, IntPtr, int>)&ReadDir;
-        ops[27] = (IntPtr)(delegate* unmanaged[Cdecl]<byte*, IntPtr, int>)&Release;  // releasedir
-        ops[31] = (IntPtr)(delegate* unmanaged[Cdecl]<byte*, int, int>)&Access;
-        ops[32] = ops[3];  // create
-        ops[33] = ops[3];  // ftruncate
-        ops[36] = ops[3];  // utimens
+        var getattr = (IntPtr)(delegate* unmanaged[Cdecl]<byte*, byte*, int>)&GetAttr;
+        var readOnly = (IntPtr)(delegate* unmanaged[Cdecl]<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int>)&ReadOnly;
+        var open = (IntPtr)(delegate* unmanaged[Cdecl]<byte*, int*, int>)&Open;
+        var read = (IntPtr)(delegate* unmanaged[Cdecl]<byte*, byte*, nuint, long, IntPtr, int>)&Read;
+        var release = (IntPtr)(delegate* unmanaged[Cdecl]<byte*, IntPtr, int>)&Release;
+        var opendir = (IntPtr)(delegate* unmanaged[Cdecl]<byte*, IntPtr, int>)&OpenDir;
+        var readdir = (IntPtr)(delegate* unmanaged[Cdecl]<byte*, IntPtr, IntPtr, long, IntPtr, int>)&ReadDir;
+        var access = (IntPtr)(delegate* unmanaged[Cdecl]<byte*, int, int>)&Access;
+        ops[0] = getattr;
+        if (fuse3)
+        {
+            // mknod mkdir unlink rmdir symlink rename link chmod chown truncate, write, setxattr, create, utimens
+            foreach (int i in new[] { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 14, 19, 30, 32 }) ops[i] = readOnly;
+            ops[12] = open;
+            ops[13] = read;
+            ops[17] = release;
+            ops[23] = opendir;
+            ops[24] = readdir;
+            ops[25] = release;  // releasedir
+            ops[29] = access;
+        }
+        else
+        {
+            // mknod mkdir unlink rmdir symlink rename link chmod chown truncate utime, write, setxattr, create, ftruncate, utimens
+            foreach (int i in new[] { 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 16, 21, 32, 33, 36 }) ops[i] = readOnly;
+            ops[14] = open;
+            ops[15] = read;
+            ops[19] = release;
+            ops[25] = opendir;
+            ops[26] = readdir;
+            ops[27] = release;  // releasedir
+            ops[31] = access;
+        }
 
         var args = new[] { "MLVDrive", mountPoint, "-f" }.Concat(options.Length > 0 ? new[] { "-o", options } : Array.Empty<string>()).ToArray();
         var argv = (IntPtr*)NativeMemory.AllocZeroed((nuint)((args.Length + 1) * sizeof(IntPtr)));
@@ -169,14 +181,15 @@ static unsafe class Fuse2
         try
         {
             if (Find(path) is not VDirectory dir) return -ENOENT;
-            var fill = (delegate* unmanaged[Cdecl]<IntPtr, byte*, IntPtr, long, int>)filler;
+            // FUSE 3's filler has a trailing flags argument (0); FUSE 2's ignores it
+            var fill = (delegate* unmanaged[Cdecl]<IntPtr, byte*, IntPtr, long, int, int>)filler;
             Span<byte> name = stackalloc byte[1024];
             foreach (var entry in new[] { ".", ".." }.Concat(dir.Children().Select(c => c.Name)))
             {
                 int n = System.Text.Encoding.UTF8.GetBytes(entry, name[..^1]);
                 name[n] = 0;
                 fixed (byte* p = name)
-                    if (fill(buffer, p, IntPtr.Zero, 0) != 0) break;
+                    if (fill(buffer, p, IntPtr.Zero, 0, 0) != 0) break;
             }
             return 0;
         }
@@ -212,7 +225,8 @@ static unsafe class StatLayout
 
     public static void Write(byte* st, VNode node, uint uid, uint gid)
     {
-        new Span<byte>(st, 144).Clear();
+        bool arm64Linux = OperatingSystem.IsLinux() && RuntimeInformation.ProcessArchitecture == Architecture.Arm64;
+        new Span<byte>(st, arm64Linux ? 128 : 144).Clear();
         bool dir = node is VDirectory;
         uint mode = dir ? S_IFDIR | 0x16D /* 0555 */ : S_IFREG | 0x124 /* 0444 */;
         long size = node is VFile f ? f.Size : 0;
@@ -231,6 +245,19 @@ static unsafe class StatLayout
             *(long*)(st + 96) = size;
             *(long*)(st + 104) = blocks;
             *(int*)(st + 112) = 4096;                    // st_blksize
+        }
+        else if (arm64Linux)
+        {
+            // glibc aarch64: 128 bytes
+            *(uint*)(st + 16) = mode;
+            *(uint*)(st + 20) = (uint)(dir ? 2 : 1);    // st_nlink
+            *(uint*)(st + 24) = uid;
+            *(uint*)(st + 28) = gid;
+            *(long*)(st + 48) = size;
+            *(int*)(st + 56) = 4096;                     // st_blksize
+            *(long*)(st + 64) = blocks;
+            foreach (int t in new[] { 72, 88, 104 })     // atime, mtime, ctime (timespec)
+                *(long*)(st + t) = secs;
         }
         else
         {

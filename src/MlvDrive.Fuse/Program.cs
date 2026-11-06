@@ -19,7 +19,7 @@ if (Fuse2.LoadLibrary() is not { } lib)
 {
     Console.Error.WriteLine(OperatingSystem.IsMacOS()
         ? "MLV Drive needs FUSE-T (recommended, https://www.fuse-t.org - or: brew install macos-fuse-t/homebrew-cask/fuse-t)\nor macFUSE (https://macfuse.github.io). Install one, then run this again."
-        : "MLV Drive needs libfuse 2 (e.g. apt install libfuse2), or set MLVDRIVE_LIBFUSE to its path.");
+        : "MLV Drive needs FUSE (apt install fuse3, dnf install fuse3, or pacman -S fuse3), or set MLVDRIVE_LIBFUSE to the library's path.");
     return 1;
 }
 Log.Write($"MLV Drive {typeof(Options).Assembly.GetName().Version} using {lib.Path}");
@@ -96,7 +96,7 @@ static class Unmount
     {
         var tries = OperatingSystem.IsMacOS()
             ? new[] { ("/sbin/umount", new[] { mountPoint }), ("/usr/sbin/diskutil", new[] { "unmount", "force", mountPoint }) }
-            : new[] { ("fusermount", new[] { "-u", mountPoint }), ("umount", new[] { mountPoint }) };
+            : new[] { ("fusermount3", new[] { "-u", mountPoint }), ("fusermount", new[] { "-u", mountPoint }), ("umount", new[] { mountPoint }) };
         foreach (var (tool, args) in tries)
         {
             try
@@ -172,6 +172,7 @@ sealed class UnixSourceWatcher : IDisposable
                     if (info.Name.StartsWith('.')) continue;
                     if (Path.GetFullPath(dir) == _options.MountPoint) continue;
                     if (info.Name == "MLV Drive") continue;
+                    if (bases.Contains(dir)) continue;                         // /media/<user>, listed itself
                     list.Add(new ClipSource(info.Name, dir));
                 }
             }
