@@ -12,7 +12,7 @@ namespace MlvDrive.Core.Dng;
 /// <param name="ScratchLatencyMs">Calibration for the 6D Mark II's scratch WAV: how much later its
 /// first sample comes than the moment the camera stamped (see <see cref="ScratchWav"/>).</param>
 /// <param name="MergeDualIso">Blend Dual ISO clips into one exposure, rather than showing their line pairs.</param>
-public sealed record DngOptions(double? FrameRateOverride = null, double ScratchLatencyMs = 0, bool MergeDualIso = true);
+public sealed record DngOptions(double? FrameRateOverride = null, double ScratchLatencyMs = 0, bool MergeDualIso = false);
 
 /// <summary>
 /// A clip presented as a CinemaDNG sequence: one virtual DNG per frame, each a fixed

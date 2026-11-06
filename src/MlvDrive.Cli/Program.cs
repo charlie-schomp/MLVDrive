@@ -24,7 +24,7 @@ static int Run(string[] args)
         return args[0] switch
         {
             "info" when args.Length >= 2 => Info(args[1], Option(args, "--latency-ms") ?? 0),
-            "export" when args.Length >= 3 => Export(args[1], args[2], Option(args, "--fps"), Option(args, "--latency-ms") ?? 0, !args.Contains("--no-dual-iso")),
+            "export" when args.Length >= 3 => Export(args[1], args[2], Option(args, "--fps"), Option(args, "--latency-ms") ?? 0, args.Contains("--dual-iso")),
             "testclip" when args.Length >= 2 => TestClip(args[1], (int)(Option(args, "--bpp") ?? 12)),
             "drift" when args.Length >= 2 => Drift(args[1], Option(args, "--step") ?? 10),
             "tree" when args.Length >= 2 => Tree(args[1]),
@@ -41,7 +41,7 @@ static int Run(string[] args)
 
 static int Usage()
 {
-    Console.Error.WriteLine("usage: mlvdrive-cli info CLIP.MLV [--latency-ms N] | export CLIP.MLV OUTDIR [--fps N] [--latency-ms N] [--no-dual-iso] | testclip OUTDIR [--bpp 10|12|14] | drift CLIP.MLV|FILE.WAV [--step 10]");
+    Console.Error.WriteLine("usage: mlvdrive-cli info CLIP.MLV [--latency-ms N] | export CLIP.MLV OUTDIR [--fps N] [--latency-ms N] [--dual-iso] | testclip OUTDIR [--bpp 10|12|14] | drift CLIP.MLV|FILE.WAV [--step 10]");
     return 2;
 }
 

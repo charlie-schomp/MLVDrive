@@ -10,6 +10,7 @@ public class DualIsoTests
 {
     const int Black = 512, White = 4050, W = 256, H = 128;
     const double Gain = 3.25;
+    static readonly DngOptions Merge = new(MergeDualIso: true);
 
     /// <summary>A smooth scene in dark-row units, reaching past where the bright rows clip.</summary>
     static double Scene(int x) => 8 + 2600.0 * x / (W - 1);
@@ -42,7 +43,7 @@ public class DualIsoTests
     {
         using var t = new TempDir();
         using var clip = MlvClip.Open(WriteClip(t, phase));
-        var info = new DngSequence(clip).DualIso;
+        var info = new DngSequence(clip, Merge).DualIso;
         Assert.NotNull(info);
         Assert.Equal(phase, info!.Value.BrightPhase);
         Assert.InRange(info.Value.Gain, Gain * 0.97, Gain * 1.03);
@@ -54,7 +55,7 @@ public class DualIsoTests
     {
         using var t = new TempDir();
         using var clip = MlvClip.Open(WriteClip(t, phase));
-        var seq = new DngSequence(clip);
+        var seq = new DngSequence(clip, Merge);
         var px = Pixels(seq, 1);
         int scale = DualIso.OutputScale(White);
         for (int y = 4; y < H - 4; y++)
@@ -70,7 +71,7 @@ public class DualIsoTests
     {
         using var t = new TempDir();
         using var clip = MlvClip.Open(WriteClip(t, 0));
-        var seq = new DngSequence(clip);
+        var seq = new DngSequence(clip, Merge);
         var bytes = new byte[seq.FileSize];
         seq.Read(0, 0, bytes);
         var tags = new TiffReader(bytes).Ifd0;
@@ -89,11 +90,11 @@ public class DualIsoTests
     }
 
     [Fact]
-    public void Off_leaves_the_recorded_rows_alone()
+    public void Off_by_default_leaves_the_recorded_rows_alone()
     {
         using var t = new TempDir();
         using var clip = MlvClip.Open(WriteClip(t, 0));
-        var seq = new DngSequence(clip, new DngOptions(MergeDualIso: false));
+        var seq = new DngSequence(clip);
         Assert.Null(seq.DualIso);
         var px = Pixels(seq, 0);
         Assert.Equal(Recorded(100, 40, 0), px[40 * W + 100]);
@@ -110,7 +111,7 @@ public class DualIsoTests
             PixelFunction = (_, x, _) => (ushort)Math.Round(Black + Scene(x)),
         }.Write(t.Path, "M01-0001", new[] { 2 });
         using var clip = MlvClip.Open(path);
-        Assert.Null(new DngSequence(clip).DualIso);
+        Assert.Null(new DngSequence(clip, Merge).DualIso);
     }
 
     [Fact]
@@ -118,6 +119,6 @@ public class DualIsoTests
     {
         using var t = new TempDir();
         using var clip = MlvClip.Open(WriteClip(t, 0, mode: 0));
-        Assert.Null(new DngSequence(clip).DualIso);
+        Assert.Null(new DngSequence(clip, Merge).DualIso);
     }
 }
