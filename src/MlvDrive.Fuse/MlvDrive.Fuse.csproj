@@ -18,7 +18,11 @@
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <!-- Not on Apple Silicon: .NET 8 loads a compressed bundle's precompiled code into memory that macOS
+         sometimes leaves non-executable, so a cold start under parallel reads (Resolve importing a folder)
+         dies with an AccessViolationException somewhere different each time. Fixed only in .NET 10.0.13
+         and 11: dotnet/runtime issue 123324, PR 127355. -->
+    <EnableCompressionInSingleFile Condition="'$(RuntimeIdentifier)' != 'osx-arm64'">true</EnableCompressionInSingleFile>
     <DebugType>embedded</DebugType>
   </PropertyGroup>
 
