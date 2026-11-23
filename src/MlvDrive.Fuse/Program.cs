@@ -124,7 +124,9 @@ static class Log
     static readonly object Lock = new();
     public static void Write(string message)
     {
-        lock (Lock) Console.WriteLine($"{DateTime.Now:HH:mm:ss}  {message}");
+        // the Terminal window may already be closed: losing a line must not stop the unmount
+        try { lock (Lock) Console.WriteLine($"{DateTime.Now:HH:mm:ss}  {message}"); }
+        catch (IOException) { }
     }
 }
 
